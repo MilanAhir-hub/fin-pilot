@@ -53,7 +53,7 @@ function TooltipBox({ x, y, children }: { x: number; y: number; children: React.
         top: y,
         transform: 'translate(-50%, -110%)',
         background: C.panel,
-        border: `1px solid ${C.border}`,
+        border: 'none',
         borderRadius: 10,
         boxShadow: 'var(--shadow-lift)',
         padding: '0.45rem 0.65rem',

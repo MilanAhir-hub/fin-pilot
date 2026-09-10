@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatINR, toPaise } from '@finpilot/shared';
 import { api, RequestError } from '../../lib/api';
-import { C } from '../../lib/ui';
+import { C, Dropdown } from '../../lib/ui';
 import type { AccountRow } from '../accounts/AccountsTree';
 
 // Manual journal vouchers (Phase 5) — post and reverse against the engine.
@@ -128,6 +128,20 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
     }
   }
 
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleEntry(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
   return (
     <div>
       <h3 style={{ marginBottom: 4 }}>Manual journal voucher</h3>
@@ -150,27 +164,23 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
         </div>
         {lines.map((line, i) => (
           <div style={S.row} key={i}>
-            <select
-              style={{ ...S.input, flex: 1 }}
+            <Dropdown
+              style={{ ...S.input, height: 38, flex: 1, minWidth: 160 }}
               value={line.accountId}
-              onChange={(e) => setLine(i, { accountId: e.target.value })}
+              onChange={(v) => setLine(i, { accountId: v })}
+              placeholder="— account —"
               required
-            >
-              <option value="">— account —</option>
-              {postable.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code} · {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              style={S.input}
+              options={postable.map((a) => ({ value: a.id, label: `${a.code} · ${a.name}` }))}
+            />
+            <Dropdown
+              style={{ ...S.input, height: 38, width: 85 }}
               value={line.side}
-              onChange={(e) => setLine(i, { side: e.target.value as FormLine['side'] })}
-            >
-              <option value="debit">Dr</option>
-              <option value="credit">Cr</option>
-            </select>
+              onChange={(v) => setLine(i, { side: v as FormLine['side'] })}
+              options={[
+                { value: 'debit', label: 'Dr' },
+                { value: 'credit', label: 'Cr' },
+              ]}
+            />
             <input
               style={{ ...S.input, width: 110 }}
               placeholder="₹0.00"
@@ -211,48 +221,266 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
       </form>
       {error && <p style={S.error}>{error}</p>}
 
-      <h3 style={{ marginTop: '1.5rem' }}>Day book</h3>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '2rem',
+          marginBottom: '0.85rem',
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Day book</h3>
+        {entries.length > 0 && (
+          <button
+            type="button"
+            className="fp-btn"
+            style={{
+              background: C.panel2,
+              border: 'none',
+              color: C.text,
+              padding: '0.4rem 0.85rem',
+              borderRadius: 8,
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              if (expandedIds.size === entries.length) {
+                setExpandedIds(new Set());
+              } else {
+                setExpandedIds(new Set(entries.map((e) => e.id)));
+              }
+            }}
+          >
+            {expandedIds.size === entries.length ? 'Collapse all' : 'Expand all'}
+          </button>
+        )}
+      </div>
+
       {entries.length === 0 && <p style={S.muted}>No entries yet.</p>}
-      {entries.map((entry) => (
-        <div
-          key={entry.id}
-          style={{
-            borderTop: `1px solid ${C.border}`,
-            padding: '0.5rem 0',
-            opacity: entry.status === 'reversed' ? 0.55 : 1,
-          }}
-        >
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className="fp-mono" style={{ color: C.muted }}>
-              {entry.entryNumber}
-            </span>
-            <span>{entry.narration}</span>
-            <span style={S.muted}>{new Date(entry.date).toLocaleDateString('en-IN')}</span>
-            <span className="fp-mono" style={{ marginLeft: 'auto' }}>
-              {formatINR(entry.totalDebitPaise)}
-            </span>
-            {entry.status === 'posted' && !entry.reversedByEntryId ? (
-              <button
-                style={{ ...S.button, background: C.red, color: '#fff' }}
-                onClick={() => void reverse(entry.id)}
+
+      {entries.map((entry) => {
+        const isExpanded = expandedIds.has(entry.id);
+        return (
+          <div
+            key={entry.id}
+            style={{
+              border: 'none',
+              borderRadius: 12,
+              marginBottom: '0.65rem',
+              background: C.panel,
+              boxShadow: 'var(--shadow)',
+              opacity: entry.status === 'reversed' ? 0.6 : 1,
+              transition: 'background 0.15s ease, box-shadow 0.15s ease',
+            }}
+          >
+            <div
+              onClick={() => toggleEntry(entry.id)}
+              style={{
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 18,
+                  height: 18,
+                  fontSize: '0.7rem',
+                  color: C.muted,
+                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease',
+                  flexShrink: 0,
+                }}
               >
-                reverse
-              </button>
-            ) : (
-              <span style={{ fontSize: '0.75rem', color: C.red }}>{entry.status}</span>
+                ▶
+              </span>
+
+              <span
+                className="fp-mono"
+                style={{
+                  background: C.panel2,
+                  border: 'none',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: 6,
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: C.text,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {entry.entryNumber}
+              </span>
+
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: C.text,
+                  fontSize: '0.875rem',
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={entry.narration}
+              >
+                {entry.narration}
+              </span>
+
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  color: C.muted,
+                  background: C.panel2,
+                  border: 'none',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: 6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {entry.lines.length} {entry.lines.length === 1 ? 'line' : 'lines'}
+              </span>
+
+              <span style={{ color: C.muted, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                {new Date(entry.date).toLocaleDateString('en-IN')}
+              </span>
+
+              <span
+                className="fp-mono"
+                style={{
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  color: C.text,
+                  minWidth: 100,
+                  textAlign: 'right',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {formatINR(entry.totalDebitPaise)}
+              </span>
+
+              {entry.status === 'posted' && !entry.reversedByEntryId ? (
+                <button
+                  type="button"
+                  style={{
+                    ...S.button,
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: 'none',
+                    color: C.red,
+                    padding: '0.25rem 0.65rem',
+                    fontSize: '0.75rem',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void reverse(entry.id);
+                  }}
+                >
+                  reverse
+                </button>
+              ) : (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: C.red,
+                    border: 'none',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  {entry.status}
+                </span>
+              )}
+            </div>
+
+            {isExpanded && (
+              <div
+                style={{
+                  padding: '0 1rem 0.85rem 2.75rem',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: C.panel2,
+                    borderRadius: 10,
+                    border: 'none',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '50px 1fr 140px',
+                      gap: 8,
+                      fontWeight: 600,
+                      fontSize: '0.72rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: C.muted,
+                      padding: '0.4rem 0.65rem',
+                      background: 'color-mix(in srgb, var(--panel-3) 50%, transparent)',
+                      borderRadius: 6,
+                      marginBottom: '0.4rem',
+                    }}
+                  >
+                    <span>Side</span>
+                    <span>Account</span>
+                    <span style={{ textAlign: 'right' }}>Amount</span>
+                  </div>
+                  {entry.lines.map((l) => (
+                    <div
+                      key={l.lineNo}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '50px 1fr 140px',
+                        gap: 8,
+                        alignItems: 'center',
+                        padding: '0.35rem 0.65rem',
+                        borderBottom: 'none',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          color: l.debitPaise > 0 ? C.green : C.amber,
+                        }}
+                      >
+                        {l.debitPaise > 0 ? 'Dr' : 'Cr'}
+                      </span>
+                      <span style={{ color: C.text }}>
+                        {accountName(l.accountId)}
+                      </span>
+                      <span
+                        className="fp-mono"
+                        style={{
+                          textAlign: 'right',
+                          fontWeight: 500,
+                          color: C.text,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {formatINR(l.debitPaise > 0 ? l.debitPaise : l.creditPaise)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-          <div style={{ fontSize: '0.8rem', color: C.muted, paddingLeft: 8 }}>
-            {entry.lines.map((l) => (
-              <div key={l.lineNo}>
-                {l.debitPaise > 0
-                  ? `Dr ${accountName(l.accountId)} ${formatINR(l.debitPaise)}`
-                  : `Cr ${accountName(l.accountId)} ${formatINR(l.creditPaise)}`}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

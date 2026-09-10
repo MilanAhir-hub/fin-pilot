@@ -3,7 +3,7 @@
  * column mapping and fingerprint dedupe, then suggestion → human confirm.
  * Suggestions never post; only the Confirm button does.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, fileToBase64, qs } from '../../lib/api';
 import {
   Badge,
@@ -102,6 +102,8 @@ export function BankingPage() {
   const [notice, setNotice] = useState('');
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<ScanResult | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function createAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -157,6 +159,7 @@ export function BankingPage() {
       );
       setCsv('');
       setScan(null);
+      setSelectedFileName('');
       txns.reload();
       suggestions.reload();
     } catch (err) {
@@ -219,24 +222,110 @@ export function BankingPage() {
 
       {active && (
         <>
-          <Card title="Scan a statement — PDF or photo">
-            <p style={{ color: C.muted, fontSize: '0.85rem', marginTop: 0 }}>
-              OCR reads the rows and, where the statement prints a running balance, checks each
-              amount against the balance movement. Rows land in the box below for you to review —{' '}
-              <b>nothing is imported until you press Import</b>.
-            </p>
-            <input
-              type="file"
-              accept="application/pdf,image/*"
-              style={{ color: C.text }}
-              disabled={scanning || !active}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void scanStatement(file);
-                e.target.value = '';
+          <Card
+            title={
+              <div style={{ width: '100%', textAlign: 'center' }}>
+                Scan a statement — PDF or photo
+              </div>
+            }
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: '0.25rem 0',
               }}
-            />
-            {scanning && <p style={{ color: C.muted }}>Reading the statement…</p>}
+            >
+              <p
+                style={{
+                  color: C.muted,
+                  fontSize: '0.85rem',
+                  marginTop: 0,
+                  maxWidth: 640,
+                  lineHeight: 1.5,
+                }}
+              >
+                OCR reads the rows and, where the statement prints a running balance, checks each
+                amount against the balance movement. Rows land in the box below for you to review —{' '}
+                <b>nothing is imported until you press Import</b>.
+              </p>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,image/*"
+                style={{ display: 'none' }}
+                disabled={scanning || !active}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setSelectedFileName(file.name);
+                    void scanStatement(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  margin: '1rem 0 0.5rem',
+                }}
+              >
+                <Btn
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={scanning || !active}
+                  style={{
+                    height: 40,
+                    padding: '0 1.25rem',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Choose File
+                </Btn>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={scanning || !active}
+                  className="fp-btn"
+                  style={{
+                    height: 40,
+                    padding: '0 1.1rem',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: C.panel2,
+                    color: selectedFileName ? C.text : C.muted,
+                    fontSize: '0.875rem',
+                    cursor: scanning || !active ? 'default' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    maxWidth: 280,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={selectedFileName || 'No file chosen'}
+                >
+                  {selectedFileName || 'No file chosen'}
+                </button>
+              </div>
+
+              {scanning && (
+                <p style={{ color: C.muted, fontSize: '0.85rem', margin: '0.5rem 0 0' }}>
+                  Reading the statement…
+                </p>
+              )}
+            </div>
             {scan && (
               <>
                 <p style={{ fontSize: '0.85rem', margin: '0.6rem 0 0.4rem' }}>
@@ -284,7 +373,7 @@ export function BankingPage() {
                       fontSize: '0.72rem',
                       color: C.muted,
                       background: C.panel2,
-                      border: `1px solid ${C.border}`,
+                      border: 'none',
                       borderRadius: 8,
                       padding: '0.5rem 0.6rem',
                       whiteSpace: 'pre-wrap',

@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react';
 import { api, fileToBase64 } from '../../lib/api';
-import { Badge, Btn, C, Card, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
+import { Badge, Btn, C, Card, Dropdown, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
 
 interface Extracted<T> {
   value: T | null;
@@ -171,31 +171,21 @@ export function DocumentsPage() {
               ) : (
                 <Row>
                   <Field label="Vendor (confirm the match)">
-                    <select
+                    <Dropdown
                       style={S.input}
                       value={partyId}
-                      onChange={(e) => setPartyId(e.target.value)}
-                    >
-                      <option value="">— pick vendor —</option>
-                      {vendors.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setPartyId}
+                      placeholder="— pick vendor —"
+                      options={vendors.map((p) => ({ value: p.id, label: p.name }))}
+                    />
                   </Field>
                   <Field label="GST %">
-                    <select
-                      style={{ ...S.input, width: 80 }}
+                    <Dropdown
+                      style={{ ...S.input, width: 85 }}
                       value={gstRate}
-                      onChange={(e) => setGstRate(e.target.value)}
-                    >
-                      {['0', '5', '18', '40'].map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setGstRate}
+                      options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
+                    />
                   </Field>
                   <Btn disabled={!partyId} onClick={() => void createBill(doc)}>
                     Create bill draft from this document

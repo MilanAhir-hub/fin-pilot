@@ -72,7 +72,7 @@ export function ThemeToggle() {
       style={{
         background: C.panel2,
         color: C.text,
-        border: `1px solid ${C.border}`,
+        border: 'none',
         borderRadius: 999,
         width: 42,
         height: 42,
@@ -95,14 +95,15 @@ export const S: Record<string, CSSProperties> = {
     width: '100%',
     boxSizing: 'border-box',
     margin: 0,
-    height: 52,
+    height: 48,
     padding: '0 1rem',
     borderRadius: 8,
-    border: `1px solid ${C.border}`,
-    background: C.panel,
+    border: 'none',
+    background: C.panel2,
     color: C.text,
     fontSize: '0.95rem',
     fontFamily: 'inherit',
+    outline: 'none',
   },
   label: { fontSize: '0.8rem', color: C.text, fontWeight: 500 },
 };
@@ -113,26 +114,32 @@ export function Btn({
   kind = 'primary',
   disabled,
   small,
+  iconOnly,
   type,
+  title,
+  style,
 }: {
   children: ReactNode;
   onClick?: () => void;
   kind?: 'primary' | 'ghost' | 'danger' | 'success';
   disabled?: boolean;
   small?: boolean;
+  iconOnly?: boolean;
   type?: 'submit' | 'button';
+  title?: string;
+  style?: CSSProperties;
 }) {
   const styles: CSSProperties =
     kind === 'primary'
-      ? { background: C.accent, color: C.accentText, borderRadius: 8, fontWeight: 500 }
+      ? { background: C.accent, color: C.accentText, borderRadius: 8, fontWeight: 500, border: 'none' }
       : kind === 'danger'
-        ? { background: C.red, color: '#fff', borderRadius: 8, fontWeight: 500 }
+        ? { background: C.red, color: '#fff', borderRadius: 8, fontWeight: 500, border: 'none' }
         : kind === 'success'
-          ? { background: C.green, color: '#fff', borderRadius: 8, fontWeight: 500 }
+          ? { background: C.green, color: '#fff', borderRadius: 8, fontWeight: 500, border: 'none' }
           : {
-              background: C.panel,
+              background: C.panel2,
               color: C.text,
-              border: `1px solid ${C.text}`,
+              border: 'none',
               borderRadius: 8,
               fontWeight: 500,
             };
@@ -141,10 +148,13 @@ export function Btn({
       type={type ?? (onClick ? 'button' : 'submit')}
       onClick={onClick}
       disabled={disabled}
+      title={title}
+      aria-label={title}
       className="fp-btn"
       style={{
-        padding: small ? '0 1rem' : '0 1.6rem',
-        height: small ? 40 : 52,
+        padding: iconOnly ? 0 : small ? '0 1rem' : '0 1.6rem',
+        width: iconOnly ? (small ? 32 : 40) : undefined,
+        height: iconOnly ? (small ? 32 : 40) : small ? 40 : 52,
         fontSize: small ? '0.85rem' : '0.95rem',
         opacity: disabled ? 0.5 : 1,
         cursor: disabled ? 'default' : 'pointer',
@@ -153,7 +163,9 @@ export function Btn({
         alignItems: 'center',
         justifyContent: 'center',
         boxSizing: 'border-box',
+        flexShrink: 0,
         ...styles,
+        ...style,
       }}
     >
       {children}
@@ -240,7 +252,7 @@ export function Tbl({
     <div style={{ overflowX: 'auto' }}>
       <table
         className="fp-table"
-        style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}
+        style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 2px', fontSize: '0.87rem' }}
       >
         <thead>
           <tr>
@@ -249,14 +261,21 @@ export function Tbl({
                 key={i}
                 style={{
                   textAlign: 'left',
-                  padding: '0.5rem 0.65rem',
-                  borderBottom: `2px solid ${C.border}`,
+                  padding: '0.6rem 0.85rem',
+                  background: C.panel2,
+                  border: 'none',
                   color: C.muted,
                   fontWeight: 700,
                   fontSize: '0.72rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
                   whiteSpace: 'nowrap',
+                  borderRadius:
+                    i === 0
+                      ? '8px 0 0 8px'
+                      : i === head.length - 1
+                        ? '0 8px 8px 0'
+                        : undefined,
                 }}
               >
                 {h}
@@ -266,11 +285,20 @@ export function Tbl({
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i}>
+            <tr key={i} style={{ background: i % 2 === 1 ? 'color-mix(in srgb, var(--panel-2) 40%, transparent)' : 'transparent' }}>
               {r.map((cell, j) => (
                 <td
                   key={j}
-                  style={{ padding: '0.5rem 0.65rem', borderBottom: `1px solid ${C.border}` }}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    border: 'none',
+                    borderRadius:
+                      j === 0
+                        ? '6px 0 0 6px'
+                        : j === r.length - 1
+                          ? '0 6px 6px 0'
+                          : undefined,
+                  }}
                 >
                   {cell}
                 </td>
@@ -324,13 +352,16 @@ export function Badge({ value }: { value: string }) {
   return (
     <span
       style={{
-        border: `1px solid ${color}`,
+        border: 'none',
+        background: `color-mix(in srgb, ${color} 14%, transparent)`,
         color,
         borderRadius: 999,
-        padding: '0.08rem 0.6rem',
+        padding: '0.18rem 0.65rem',
         fontSize: '0.72rem',
         fontWeight: 600,
         whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
       }}
     >
       {value.replace(/_/g, ' ')}
@@ -361,10 +392,10 @@ export function Err({ error }: { error: unknown }) {
         color: C.red,
         fontSize: '0.85rem',
         whiteSpace: 'pre-wrap',
-        background: 'color-mix(in srgb, var(--red) 9%, transparent)',
-        border: `1px solid color-mix(in srgb, var(--red) 30%, transparent)`,
+        background: 'color-mix(in srgb, var(--red) 12%, transparent)',
+        border: 'none',
         borderRadius: 10,
-        padding: '0.5rem 0.75rem',
+        padding: '0.6rem 0.85rem',
       }}
     >
       {msg}
@@ -424,3 +455,5 @@ export function useLoad<T>(
   }, [...deps, tick]);
   return { data, error, busy, reload };
 }
+
+export { Dropdown, type DropdownOption, type DropdownProps } from '../components/Dropdown';

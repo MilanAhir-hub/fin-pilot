@@ -1,7 +1,7 @@
 /** Customers & vendors with outstandings, plus the item master (§32 Phase 6). */
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { Badge, Btn, Card, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
+import { Badge, Btn, Card, Dropdown, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
 
 interface Party {
   id: string;
@@ -60,14 +60,15 @@ function PartyForm({ onDone }: { onDone: () => void }) {
           <input style={S.input} value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field label="Type">
-          <select
-            style={S.input}
+          <Dropdown
+            style={{ ...S.input, minWidth: 140 }}
             value={type}
-            onChange={(e) => setType(e.target.value as 'customer' | 'vendor')}
-          >
-            <option value="customer">customer</option>
-            <option value="vendor">vendor</option>
-          </select>
+            onChange={(v) => setType(v as 'customer' | 'vendor')}
+            options={[
+              { value: 'customer', label: 'customer' },
+              { value: 'vendor', label: 'vendor' },
+            ]}
+          />
         </Field>
         <Field label="State code">
           <input
@@ -127,10 +128,15 @@ function ItemForm({ onDone }: { onDone: () => void }) {
           <input style={S.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cloud Consulting" required />
         </Field>
         <Field label="Type">
-          <select style={S.input} value={kind} onChange={(e) => setKind(e.target.value as 'service' | 'goods')}>
-            <option value="service">Service (SAC)</option>
-            <option value="goods">Goods (HSN)</option>
-          </select>
+          <Dropdown
+            style={{ ...S.input, minWidth: 160 }}
+            value={kind}
+            onChange={(v) => setKind(v as 'service' | 'goods')}
+            options={[
+              { value: 'service', label: 'Service (SAC)' },
+              { value: 'goods', label: 'Goods (HSN)' },
+            ]}
+          />
         </Field>
         <Field label={kind === 'service' ? 'SAC (6 digits)' : 'HSN (4, 6 or 8 digits)'}>
           <input
@@ -142,13 +148,12 @@ function ItemForm({ onDone }: { onDone: () => void }) {
           />
         </Field>
         <Field label="GST %">
-          <select style={S.input} value={gstRate} onChange={(e) => setGstRate(e.target.value)}>
-            {['0', '5', '18', '40'].map((r) => (
-              <option key={r} value={r}>
-                {r}%
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            style={{ ...S.input, width: 85 }}
+            value={gstRate}
+            onChange={setGstRate}
+            options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
+          />
         </Field>
         <Btn disabled={busy}>Add</Btn>
       </Row>

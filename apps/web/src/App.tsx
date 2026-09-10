@@ -51,7 +51,7 @@ import {
   CreditCardIcon,
   Wrench01Icon,
   Logout01Icon,
-  ArrowReloadHorizontalIcon,
+  ArrowReloadHorizontalIcon as _ArrowReloadHorizontalIcon,
 } from '@hugeicons/core-free-icons';
 
 interface PublicUser {
@@ -919,7 +919,7 @@ const NAV: Array<{
       {
         key: 'dashboard',
         label: 'Dashboard',
-        icon: <HugeiconsIcon icon={Analytics01Icon} size={28} />,
+        icon: <HugeiconsIcon icon={Analytics01Icon} size={20} />,
       },
     ],
   },
@@ -929,18 +929,18 @@ const NAV: Array<{
       {
         key: 'accounts',
         label: 'Chart of accounts',
-        icon: <HugeiconsIcon icon={HierarchyIcon} size={28} />,
+        icon: <HugeiconsIcon icon={HierarchyIcon} size={20} />,
       },
-      { key: 'journal', label: 'Journal', icon: <HugeiconsIcon icon={Book01Icon} size={28} /> },
+      { key: 'journal', label: 'Journal', icon: <HugeiconsIcon icon={Book01Icon} size={20} /> },
       {
         key: 'trial-balance',
         label: 'Trial balance',
-        icon: <HugeiconsIcon icon={BalanceScaleIcon} size={28} />,
+        icon: <HugeiconsIcon icon={BalanceScaleIcon} size={20} />,
       },
       {
         key: 'parties',
         label: 'Parties & items',
-        icon: <HugeiconsIcon icon={UserGroupIcon} size={28} />,
+        icon: <HugeiconsIcon icon={UserGroupIcon} size={20} />,
       },
     ],
   },
@@ -950,7 +950,7 @@ const NAV: Array<{
       {
         key: 'invoices',
         label: 'Invoicing',
-        icon: <HugeiconsIcon icon={Invoice01Icon} size={28} />,
+        icon: <HugeiconsIcon icon={Invoice01Icon} size={20} />,
       },
     ],
   },
@@ -960,12 +960,12 @@ const NAV: Array<{
       {
         key: 'bills',
         label: 'Bills & expenses',
-        icon: <HugeiconsIcon icon={FileDownloadIcon} size={28} />,
+        icon: <HugeiconsIcon icon={FileDownloadIcon} size={20} />,
       },
       {
         key: 'documents',
         label: 'Scan a bill (OCR)',
-        icon: <HugeiconsIcon icon={Camera01Icon} size={28} />,
+        icon: <HugeiconsIcon icon={Camera01Icon} size={20} />,
       },
     ],
   },
@@ -975,19 +975,19 @@ const NAV: Array<{
       {
         key: 'payments',
         label: 'Payments',
-        icon: <HugeiconsIcon icon={MoneySend01Icon} size={28} />,
+        icon: <HugeiconsIcon icon={MoneySend01Icon} size={20} />,
       },
       {
         key: 'banking',
         label: 'Banking & reco',
-        icon: <HugeiconsIcon icon={BankIcon} size={28} />,
+        icon: <HugeiconsIcon icon={BankIcon} size={20} />,
       },
     ],
   },
   {
     group: 'Compliance',
     items: [
-      { key: 'gst', label: 'GST & IMS', icon: <HugeiconsIcon icon={ShieldCheck} size={28} /> },
+      { key: 'gst', label: 'GST & IMS', icon: <HugeiconsIcon icon={ShieldCheck} size={20} /> },
     ],
   },
   {
@@ -996,14 +996,14 @@ const NAV: Array<{
       {
         key: 'reports',
         label: 'All reports',
-        icon: <HugeiconsIcon icon={BarChartIcon} size={28} />,
+        icon: <HugeiconsIcon icon={BarChartIcon} size={20} />,
       },
     ],
   },
   {
     group: 'AI',
     items: [
-      { key: 'copilot', label: 'Copilot', icon: <HugeiconsIcon icon={AiMagicIcon} size={28} /> },
+      { key: 'copilot', label: 'Copilot', icon: <HugeiconsIcon icon={AiMagicIcon} size={20} /> },
     ],
   },
   {
@@ -1012,15 +1012,15 @@ const NAV: Array<{
       {
         key: 'notifications',
         label: 'Notifications',
-        icon: <HugeiconsIcon icon={Notification01Icon} size={28} />,
+        icon: <HugeiconsIcon icon={Notification01Icon} size={20} />,
       },
-      { key: 'team', label: 'Team', icon: <HugeiconsIcon icon={UserGroupIcon} size={28} /> },
-      { key: 'billing', label: 'Billing', icon: <HugeiconsIcon icon={CreditCardIcon} size={28} /> },
+      { key: 'team', label: 'Team', icon: <HugeiconsIcon icon={UserGroupIcon} size={20} /> },
+      { key: 'billing', label: 'Billing', icon: <HugeiconsIcon icon={CreditCardIcon} size={20} /> },
     ],
   },
 ];
 
-const TITLES: Record<string, string> = Object.fromEntries(
+const _TITLES: Record<string, string> = Object.fromEntries(
   NAV.flatMap((s) => s.items.map((i) => [i.key, i.label])),
 );
 
@@ -1060,34 +1060,55 @@ function NavItem({
       title={collapsed ? label : undefined}
       className={`fp-nav-item${active ? ' active' : ''}`}
       style={{
-        padding: collapsed ? '0.65rem 0' : '0.6rem 0.85rem',
-        borderRadius: 12,
+        padding: collapsed ? '0.55rem 0' : '0.52rem 0.8rem',
+        borderRadius: 8,
         cursor: 'pointer',
-        fontSize: '0.94rem',
-        fontWeight: active ? 700 : 500,
-        color: active ? C.accent : C.text,
+        fontSize: '0.88rem',
+        fontWeight: active ? 600 : 450,
+        color: active ? '#ff4404' : 'var(--muted)',
+        background: active ? 'rgba(255, 68, 4, 0.08)' : 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'flex-start',
-        gap: collapsed ? 0 : 12,
-        marginBottom: 4,
+        gap: collapsed ? 0 : 11,
+        marginBottom: 2,
         position: 'relative',
-        transition: 'all 0.18s ease',
+        transition: 'all 0.15s ease',
       }}
     >
+      {active && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 6,
+            bottom: 6,
+            width: 3,
+            backgroundColor: '#ff4404',
+            borderRadius: '0 2px 2px 0',
+          }}
+        />
+      )}
       <span
         style={{
-          fontSize: collapsed ? '1.25rem' : '1.1rem',
+          fontSize: collapsed ? '1.15rem' : '1.05rem',
           display: 'inline-flex',
           alignItems: 'center',
-          color: active ? C.accent : C.muted,
+          color: active ? '#ff4404' : 'var(--muted)',
+          transition: 'color 0.15s ease',
         }}
       >
         {icon}
       </span>
       {!collapsed && (
         <span
-          style={{ flex: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+          style={{
+            flex: 1,
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
+            letterSpacing: '-0.01em',
+          }}
         >
           {label}
         </span>
@@ -1106,12 +1127,13 @@ function NavItem({
                   height: 8,
                 }
               : {
-                  background: C.red,
-                  color: '#fff',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: C.red,
                   borderRadius: 999,
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  padding: '0.1rem 0.5rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '0.05rem 0.45rem',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
                 }
           }
         >
@@ -1205,29 +1227,29 @@ function Shell({
         <aside
           className="fp-sidebar"
           style={{
-            width: collapsed ? 90 : 335,
+            width: collapsed ? 76 : 270,
             height: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            background: C.panel,
-            borderRight: `1px solid ${C.border}`,
+            background: 'var(--panel)',
+            borderRight: 'none',
+            boxShadow: 'var(--shadow)',
             position: 'relative',
           }}
         >
           {/* Header Logo section */}
           <div
             style={{
-              padding: collapsed ? '1.25rem 0.5rem 1rem' : '1.25rem 1.1rem 1rem',
+              padding: collapsed ? '1.25rem 0.5rem 1rem' : '1.35rem 1.25rem 1.1rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: collapsed ? 'center' : 'space-between',
-              borderBottom: `1px solid ${C.border}`,
             }}
           >
             {collapsed ? (
               <span style={{ fontWeight: 800, fontSize: '1.3rem', color: C.accent }}>F</span>
             ) : (
-              <Logo size="1.35rem" />
+              <Logo size="1.3rem" />
             )}
           </div>
 
@@ -1236,24 +1258,24 @@ function Shell({
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: collapsed ? '1rem 0.5rem' : '1rem 0.85rem',
+              padding: collapsed ? '0.75rem 0.5rem' : '0.75rem 0.75rem',
             }}
           >
             {NAV.map((section) => (
               <div key={section.group}>
                 {section.group &&
                   (collapsed ? (
-                    <div style={{ borderTop: `1px solid ${C.border}`, margin: '0.8rem 0.4rem' }} />
+                    <div style={{ height: 2, background: 'var(--panel-2)', margin: '0.6rem 0.5rem', borderRadius: 999 }} />
                   ) : (
                     <div
                       style={{
-                        color: C.muted,
-                        fontSize: '0.72rem',
+                        color: '#64748b',
+                        fontSize: '0.68rem',
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
-                        fontWeight: 700,
-                        margin: '1.2rem 0 0.4rem',
-                        paddingLeft: 10,
+                        fontWeight: 600,
+                        margin: '1.2rem 0 0.35rem',
+                        paddingLeft: 8,
                         whiteSpace: 'nowrap',
                       }}
                     >
@@ -1276,17 +1298,17 @@ function Shell({
             {isAdmin && (
               <div>
                 {collapsed ? (
-                  <div style={{ borderTop: `1px solid ${C.border}`, margin: '0.8rem 0.4rem' }} />
+                  <div style={{ height: 2, background: 'var(--panel-2)', margin: '0.6rem 0.5rem', borderRadius: 999 }} />
                 ) : (
                   <div
                     style={{
-                      color: C.muted,
-                      fontSize: '0.72rem',
+                      color: '#64748b',
+                      fontSize: '0.68rem',
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
-                      fontWeight: 700,
-                      margin: '1.2rem 0 0.4rem',
-                      paddingLeft: 10,
+                      fontWeight: 600,
+                      margin: '1.2rem 0 0.35rem',
+                      paddingLeft: 8,
                     }}
                   >
                     Operator
@@ -1294,13 +1316,54 @@ function Shell({
                 )}
                 <NavItem
                   active={route === 'admin'}
-                  icon={<HugeiconsIcon icon={Wrench01Icon} size={28} />}
+                  icon={<HugeiconsIcon icon={Wrench01Icon} size={20} />}
                   label="Admin console"
                   collapsed={collapsed}
                   onClick={() => go('admin')}
                 />
               </div>
             )}
+          </div>
+
+          {/* Bottom Settings item */}
+          <div
+            style={{
+              padding: collapsed ? '0.5rem' : '0.6rem 0.75rem',
+              borderTop: 'none',
+              background: 'var(--panel)',
+            }}
+          >
+            <div
+              style={{
+                padding: collapsed ? '0.55rem 0' : '0.52rem 0.8rem',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: '0.88rem',
+                color: 'var(--muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                gap: collapsed ? 0 : 11,
+                transition: 'all 0.15s ease',
+              }}
+              className="fp-nav-item"
+              title="Settings"
+            >
+              <svg
+                width="19"
+                height="19"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              {!collapsed && <span>Settings</span>}
+            </div>
           </div>
         </aside>
         <button
@@ -1334,43 +1397,198 @@ function Shell({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '1rem 2.5rem',
-            borderBottom: `1px solid ${C.border}`,
-            background: C.panel,
+            padding: '0.8rem 2.5rem',
+            borderBottom: 'none',
+            background: 'var(--panel)',
+            boxShadow: 'var(--shadow)',
             position: 'sticky',
             top: 0,
-            zIndex: 5,
+            zIndex: 15,
           }}
         >
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '1.15rem', letterSpacing: '-0.01em' }}>
-              {TITLES[route] ?? 'Dashboard'}
-            </div>
-            <div style={{ color: C.muted, fontSize: '0.8rem' }}>{company.legalName}</div>
+          {/* Left: Company selector button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              onClick={onSwitch}
+              title="Switch company"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '0.45rem 0.9rem',
+                borderRadius: 8,
+                background: 'var(--panel-2)',
+                border: 'none',
+                color: C.text,
+                fontSize: '0.86rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--panel-3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--panel-2)';
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.75 }}
+              >
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+                <path d="M9 22v-4h6v4" />
+                <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01" />
+              </svg>
+              <span>{company.legalName}</span>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.5, marginLeft: 2 }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ color: C.muted, fontSize: '0.85rem' }}>
-              {user.name} · {company.role.name}
-            </span>
+
+          {/* Right: Search, Theme Toggle, Profile Avatar, Neutral Sign out */}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            {/* Search Bar */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--panel-2)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '0.42rem 0.85rem',
+                color: C.muted,
+                fontSize: '0.84rem',
+                minWidth: 220,
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.6 }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span style={{ flex: 1, opacity: 0.75 }}>Search anything...</span>
+              <kbd
+                style={{
+                  fontSize: '0.68rem',
+                  background: 'var(--panel-3)',
+                  border: 'none',
+                  borderRadius: 4,
+                  padding: '2px 6px',
+                  color: C.muted,
+                  fontFamily: 'inherit',
+                }}
+              >
+                Ctrl K
+              </kbd>
+            </div>
+
+            {/* Theme Toggle */}
             <ThemeToggle />
-            <Btn small kind="ghost" onClick={onSwitch}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={19} />
-                Switch company
-              </span>
-            </Btn>
-            <Btn small kind="primary" onClick={onLogout}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <HugeiconsIcon icon={Logout01Icon} size={19} />
-                Sign out
-              </span>
-            </Btn>
+
+            {/* User Profile Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '50%',
+                  background: 'var(--panel-2)',
+                  border: 'none',
+                  color: 'var(--text)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {user.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'DO'}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span
+                  style={{ color: C.text, fontSize: '0.83rem', fontWeight: 600, lineHeight: 1.25 }}
+                >
+                  {user.name}
+                </span>
+                <span style={{ color: C.muted, fontSize: '0.73rem', lineHeight: 1.25 }}>
+                  {company.role.name}
+                </span>
+              </div>
+            </div>
+
+            {/* Neutral Secondary Sign out button */}
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Sign out"
+              style={{
+                background: 'var(--panel-2)',
+                border: 'none',
+                color: C.muted,
+                padding: '0.45rem 0.8rem',
+                borderRadius: 8,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = C.text;
+                e.currentTarget.style.background = 'var(--panel-3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = C.muted;
+                e.currentTarget.style.background = 'var(--panel-2)';
+              }}
+            >
+              <HugeiconsIcon icon={Logout01Icon} size={15} />
+              <span>Sign out</span>
+            </button>
           </div>
         </header>
         <main
           key={route}
           style={{
-            padding: '1.75rem 2.5rem',
+            padding: '2rem 2.75rem',
             width: '100%',
             maxWidth: '100%',
             minWidth: 0,

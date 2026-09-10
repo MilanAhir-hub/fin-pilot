@@ -17,41 +17,55 @@
 
 :root,
 :root[data-theme='light'] {
-  --bg: #ffffff;
+  --bg: #f1f5f9;
   --panel: #ffffff;
-  --panel-2: #f8fafc;
-  --border: #e2e8f0;
+  --panel-2: #e8edf5;
+  --panel-3: #dde4ee;
+  --border: transparent;
+  --border-subtle: transparent;
   --text: #0f172a;
   --muted: #64748b;
+  --input-bg: #e8edf5;
   --accent: #ff4404;
   --accent-2: #d63600;
-  --accent-soft: #fff2eb;
+  --accent-soft: rgba(255, 68, 4, 0.08);
   --on-accent: #ffffff;
   --green: #10b981;
+  --green-soft: rgba(16, 185, 129, 0.08);
+  --green-border: transparent;
   --red: #ef4444;
+  --red-soft: rgba(239, 68, 68, 0.08);
+  --red-border: transparent;
   --amber: #f59e0b;
-  --shadow: none;
-  --shadow-lift: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --accent-glow: rgba(255, 68, 4, 0.08);
+  --shadow: 0 2px 10px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
+  --shadow-lift: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --accent-glow: rgba(255, 68, 4, 0.12);
 }
 
 :root[data-theme='dark'] {
-  --bg: #0b0f17;
-  --panel: #111827;
-  --panel-2: #1f2937;
-  --border: #1f2937;
-  --text: #f9fafb;
-  --muted: #9ca3af;
+  --bg: #090d14;
+  --panel: #111824;
+  --panel-2: #192233;
+  --panel-3: #222d42;
+  --border: transparent;
+  --border-subtle: transparent;
+  --text: #f3f4f6;
+  --muted: #8b949e;
+  --input-bg: #192233;
   --accent: #ff4404;
-  --accent-2: #d63600;
-  --accent-soft: #2e1308;
+  --accent-2: #e03b00;
+  --accent-soft: rgba(255, 68, 4, 0.08);
   --on-accent: #ffffff;
   --green: #10b981;
+  --green-soft: rgba(16, 185, 129, 0.08);
+  --green-border: transparent;
   --red: #ef4444;
+  --red-soft: rgba(239, 68, 68, 0.08);
+  --red-border: transparent;
   --amber: #f59e0b;
-  --shadow: none;
-  --shadow-lift: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --accent-glow: rgba(255, 68, 4, 0.16);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 10px 32px rgba(0, 0, 0, 0.45);
+  --accent-glow: rgba(255, 68, 4, 0.18);
 }
 
 * {
@@ -59,7 +73,7 @@
 }
 
 html {
-  font-size: 125%;
+  font-size: 115%;
 }
 
 html,
@@ -209,13 +223,13 @@ body {
 
 .fp-card {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 14px;
-  box-shadow: none;
+  box-shadow: var(--shadow);
   animation: fp-fade-up 0.25s ease both;
   transition:
     background 0.25s ease,
-    border-color 0.25s ease;
+    box-shadow 0.25s ease;
 }
 
 .fp-btn {
@@ -284,6 +298,145 @@ body {
 
 .fp-table tbody tr:hover {
   background: var(--panel-2);
+}
+
+/* Modern clean fintech table */
+.fp-modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.88rem;
+}
+
+.fp-modern-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: none;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.fp-modern-table th:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.fp-modern-table th:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.fp-modern-table td {
+  padding: 14px 16px;
+  border: none;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.fp-modern-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.fp-modern-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+/* Modern fintech inputs */
+.fp-input-modern {
+  height: 44px;
+  background: var(--input-bg);
+  border: none;
+  border-radius: 9px;
+  padding: 0 14px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.fp-input-modern:focus {
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.fp-input-modern::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* Modern Action Button */
+.fp-action-btn {
+  background: var(--panel-2);
+  border: none;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.fp-action-btn:hover {
+  color: var(--text);
+  background: var(--panel-3);
+}
+
+.fp-action-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--panel);
+  border: none;
+  border-radius: 10px;
+  box-shadow: var(--shadow-lift);
+  padding: 6px;
+  z-index: 60;
+  min-width: 130px;
+  animation: fp-fade-in 0.15s ease both;
+}
+
+.fp-popover-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fp-popover-item:hover {
+  background: var(--panel-3);
+}
+
+.fp-popover-item.danger {
+  color: var(--red);
+}
+
+.fp-popover-item.danger:hover {
+  background: var(--red-soft);
+}
+
+.fp-popover-item.success {
+  color: var(--green);
+}
+
+.fp-popover-item.success:hover {
+  background: var(--green-soft);
 }
 
 .fp-mono {
@@ -361,26 +514,26 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  border: none;
+  background: var(--panel-2);
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   z-index: 30;
-  box-shadow: none;
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
     color 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .fp-collapse:hover {
   color: var(--accent);
-  border-color: var(--accent);
+  background: var(--panel-3);
   transform: scale(1.12);
 }
 
@@ -440,15 +593,13 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
-  padding: 0.8rem 0.9rem 0.85rem 1.05rem;
+  padding: 0.85rem 1rem;
   border-radius: 14px;
   overflow: hidden;
   color: var(--text);
-  background: color-mix(in srgb, var(--panel) 92%, var(--fp-toast-accent));
-  border: 1px solid color-mix(in srgb, var(--fp-toast-accent) 34%, var(--border));
-  box-shadow:
-    0 10px 30px -10px rgba(0, 0, 0, 0.28),
-    0 2px 8px -2px rgba(0, 0, 0, 0.12);
+  background: var(--panel);
+  border: none;
+  box-shadow: var(--shadow-lift);
   backdrop-filter: blur(8px);
   animation: fp-toast-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -500,7 +651,7 @@ body {
   border-radius: 6px;
   color: var(--muted);
   background: var(--panel-2);
-  border: 1px solid var(--border);
+  border: none;
 }
 
 .fp-toast-msg {
@@ -541,7 +692,7 @@ body {
   line-height: 1.5;
   color: var(--muted);
   background: var(--panel-2);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 8px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

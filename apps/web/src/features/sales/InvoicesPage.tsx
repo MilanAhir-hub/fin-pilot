@@ -4,6 +4,13 @@
  * qty, rate and GST rate.
  */
 import { useEffect, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Cancel01Icon,
+  CheckmarkCircle01Icon,
+  Mail01Icon,
+  ViewIcon,
+} from '@hugeicons/core-free-icons';
 import { GST_STATE_CODES } from '@finpilot/shared';
 import { api } from '../../lib/api';
 import {
@@ -18,6 +25,7 @@ import {
   S,
   Tbl,
   dateStr,
+  Dropdown,
   rupeesToPaise,
   today,
   useLoad,
@@ -166,19 +174,14 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
     <form onSubmit={submit}>
       <Row>
         <Field label="Customer">
-          <select
+          <Dropdown
             style={S.input}
             value={partyId}
-            onChange={(e) => setPartyId(e.target.value)}
+            onChange={setPartyId}
+            placeholder="— pick —"
             required
-          >
-            <option value="">— pick —</option>
-            {customers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            options={customers.map((p) => ({ value: p.id, label: p.name }))}
+          />
         </Field>
         <Field label="Issue date">
           <input
@@ -215,17 +218,12 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
             />
           </Field>
           <Field label="GST %">
-            <select
-              style={{ ...S.input, width: 80 }}
+            <Dropdown
+              style={{ ...S.input, width: 85 }}
               value={line.gstRate}
-              onChange={(e) => setLine(i, { gstRate: e.target.value })}
-            >
-              {['0', '5', '18', '40'].map((r) => (
-                <option key={r} value={r}>
-                  {r}%
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setLine(i, { gstRate: val })}
+              options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
+            />
           </Field>
           {lines.length > 1 && (
             <button
@@ -233,8 +231,8 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
               title="Remove line"
               onClick={() => removeLine(i)}
               style={{
-                background: 'transparent',
-                border: '1px solid var(--border)',
+                background: 'var(--panel-2)',
+                border: 'none',
                 borderRadius: 8,
                 color: 'var(--red)',
                 cursor: 'pointer',
@@ -394,22 +392,46 @@ export function InvoicesPage() {
             <Money key="t" paise={inv.grandTotalPaise} />,
             <Money key="d" paise={inv.amountDuePaise} />,
             <span key="a" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <Btn small kind="ghost" onClick={() => void openInvoiceDetails(inv)}>
-                View
+              <Btn
+                small
+                iconOnly
+                kind="ghost"
+                title="View invoice"
+                onClick={() => void openInvoiceDetails(inv)}
+              >
+                <HugeiconsIcon icon={ViewIcon} size={16} />
               </Btn>
               {inv.status === 'draft' && (
-                <Btn small onClick={() => void act(inv.id, 'issue')}>
-                  Issue
+                <Btn
+                  small
+                  iconOnly
+                  kind="primary"
+                  title="Issue invoice"
+                  onClick={() => void act(inv.id, 'issue')}
+                >
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
                 </Btn>
               )}
               {inv.status === 'issued' && (
-                <Btn small kind="ghost" onClick={() => void act(inv.id, 'send')}>
-                  Email
+                <Btn
+                  small
+                  iconOnly
+                  kind="ghost"
+                  title="Email invoice"
+                  onClick={() => void act(inv.id, 'send')}
+                >
+                  <HugeiconsIcon icon={Mail01Icon} size={16} />
                 </Btn>
               )}
               {(inv.status === 'draft' || inv.status === 'issued') && (
-                <Btn small kind="danger" onClick={() => void act(inv.id, 'cancel')}>
-                  Cancel
+                <Btn
+                  small
+                  iconOnly
+                  kind="danger"
+                  title="Cancel invoice"
+                  onClick={() => void act(inv.id, 'cancel')}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={16} />
                 </Btn>
               )}
             </span>,
@@ -437,7 +459,7 @@ export function InvoicesPage() {
             style={{
               background: C.panel,
               color: C.text,
-              border: `1px solid ${C.border}`,
+              border: 'none',
               borderRadius: 16,
               width: '100%',
               maxWidth: 880,
@@ -455,7 +477,7 @@ export function InvoicesPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                borderBottom: `1px solid ${C.border}`,
+                borderBottom: 'none',
                 paddingBottom: '1.2rem',
                 marginBottom: '1.4rem',
                 flexWrap: 'wrap',
@@ -478,16 +500,15 @@ export function InvoicesPage() {
                     '—'}{' '}
                   {GST_STATE_CODES[
                     selectedInvoice.placeOfSupplyStateCode ||
-                      selectedInvoice.partySnapshot?.stateCode ||
-                      ''
+                    selectedInvoice.partySnapshot?.stateCode ||
+                    ''
                   ]
-                    ? `(${
-                        GST_STATE_CODES[
-                          selectedInvoice.placeOfSupplyStateCode ||
-                            selectedInvoice.partySnapshot?.stateCode ||
-                            ''
-                        ]
-                      })`
+                    ? `(${GST_STATE_CODES[
+                    selectedInvoice.placeOfSupplyStateCode ||
+                    selectedInvoice.partySnapshot?.stateCode ||
+                    ''
+                    ]
+                    })`
                     : ''}
                 </p>
               </div>
@@ -500,8 +521,8 @@ export function InvoicesPage() {
                   title="Close (Esc)"
                   onClick={() => setSelectedInvoice(null)}
                   style={{
-                    background: 'transparent',
-                    border: `1px solid ${C.border}`,
+                    background: C.panel2,
+                    border: 'none',
                     borderRadius: 8,
                     color: C.muted,
                     cursor: 'pointer',
@@ -614,7 +635,7 @@ export function InvoicesPage() {
               <div
                 style={{
                   background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-                  border: `1px solid color-mix(in srgb, var(--accent) 30%, transparent)`,
+                  border: 'none',
                   borderRadius: 10,
                   padding: '0.8rem 1rem',
                   marginBottom: '1.4rem',
@@ -906,16 +927,16 @@ export function InvoicesPage() {
                 )}
                 {(selectedInvoice.status === 'draft' ||
                   selectedInvoice.status === 'issued') && (
-                  <Btn
-                    small
-                    kind="danger"
-                    onClick={async () => {
-                      await act(selectedInvoice.id, 'cancel');
-                    }}
-                  >
-                    Cancel Invoice
-                  </Btn>
-                )}
+                    <Btn
+                      small
+                      kind="danger"
+                      onClick={async () => {
+                        await act(selectedInvoice.id, 'cancel');
+                      }}
+                    >
+                      Cancel Invoice
+                    </Btn>
+                  )}
               </div>
               <Btn kind="ghost" small onClick={() => setSelectedInvoice(null)}>
                 Close
