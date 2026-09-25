@@ -10,6 +10,8 @@ import { Badge, Btn, C, Card, Dropdown, Err, Field, Money, Row, S, Tbl, useLoad 
 interface Extracted<T> {
   value: T | null;
   confidence: number;
+  status?: 'valid' | 'not_found' | 'review';
+  optional?: boolean;
 }
 interface Doc {
   id: string;
@@ -34,17 +36,65 @@ interface Party {
   type: string[];
 }
 
-function ConfidenceCell({ field, money }: { field: Extracted<unknown>; money?: boolean }) {
-  const color = field.confidence >= 0.9 ? C.green : field.confidence >= 0.6 ? C.amber : C.red;
+function ConfidenceCell({
+  field,
+  money,
+  optional,
+}: {
+  field?: Extracted<unknown>;
+  money?: boolean;
+  optional?: boolean;
+}) {
+  if (!field) {
+    return <span style={{ color: C.muted, fontSize: '0.8rem' }}>—</span>;
+  }
+  const isOptional = field.optional ?? optional;
+  const isNotFound =
+    field.status === 'not_found' || (field.value === null && field.confidence === 0);
+  const isReview =
+    field.status === 'review' || (field.confidence > 0 && field.confidence < 0.7);
+
+  if (isNotFound) {
+    return (
+      <span style={{ color: C.muted, fontSize: '0.8rem' }}>
+        Not found {isOptional ? <span style={{ opacity: 0.8 }}>(optional)</span> : ''}
+      </span>
+    );
+  }
+
+  if (isReview || field.value === null) {
+    return (
+      <span>
+        <span
+          style={{
+            display: 'inline-block',
+            padding: '1px 6px',
+            fontSize: '0.68rem',
+            fontWeight: 600,
+            borderRadius: '4px',
+            backgroundColor: '#fef3c7',
+            color: '#b45309',
+            marginRight: 6,
+          }}
+        >
+          Review
+        </span>
+        {field.value !== null && (
+          <span style={{ marginRight: 4 }}>
+            {money ? <Money paise={field.value as number} /> : String(field.value)}
+          </span>
+        )}
+        <span style={{ color: C.amber, fontSize: '0.7rem' }}>
+          ({Math.round(field.confidence * 100)}%)
+        </span>
+      </span>
+    );
+  }
+
+  const color = field.confidence >= 0.9 ? C.green : C.amber;
   return (
     <span>
-      {field.value === null ? (
-        <i style={{ color: C.muted }}>not read — fill by hand</i>
-      ) : money ? (
-        <Money paise={field.value as number} />
-      ) : (
-        String(field.value)
-      )}{' '}
+      {money ? <Money paise={field.value as number} /> : String(field.value)}{' '}
       <span style={{ color, fontSize: '0.7rem' }}>({Math.round(field.confidence * 100)}%)</span>
     </span>
   );
@@ -60,6 +110,8 @@ export function DocumentsPage() {
   const [busy, setBusy] = useState(false);
   const [partyId, setPartyId] = useState('');
   const [gstRate, setGstRate] = useState('18');
+  const [manualBillNumber, setManualBillNumber] = useState<Record<string, string>>({});
+  const [manualTaxable, setManualTaxable] = useState<Record<string, string>>({});
 
   const vendors = (parties.data?.parties ?? []).filter((p) => p.type.includes('vendor'));
 
@@ -96,12 +148,29 @@ export function DocumentsPage() {
   async function createBill(doc: Doc) {
     setError(null);
     try {
+      const overrideBillNo = manualBillNumber[doc.id]?.trim();
+      const overrideTaxable = manualTaxable[doc.id]?.trim();
       await api('POST', `/api/v1/bills/from-document/${doc.id}`, {
         partyId,
         gstRate: Number(gstRate),
+        ...(overrideBillNo ? { vendorBillNumber: overrideBillNo } : {}),
+        ...(overrideTaxable && !isNaN(Number(overrideTaxable))
+          ? { taxablePaise: Math.round(Number(overrideTaxable) * 100) }
+          : {}),
       });
       const fresh = (await api<{ document: Doc }>('GET', `/api/v1/documents/${doc.id}`)).document;
       setDocs((d) => [fresh, ...d.filter((x) => x.id !== doc.id)]);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  async function deleteDoc(id: string) {
+    setError(null);
+    try {
+      await api('DELETE', `/api/v1/documents/${id}`);
+      setDocs((d) => d.filter((x) => x.id !== id));
+      saved.reload();
     } catch (err) {
       setError(err);
     }
@@ -134,14 +203,31 @@ export function DocumentsPage() {
         <Card
           key={doc.id}
           title={
-            <span>
-              {doc.filename} <Badge value={doc.status} />{' '}
-              {doc.extractedBy && (
-                <span style={{ color: C.muted, fontSize: '0.75rem' }}>
-                  via {doc.extractedBy} · extraction cost <Money paise={doc.costPaise} />
-                </span>
-              )}
-            </span>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                width: '100%',
+              }}
+            >
+              <span>
+                {doc.filename} <Badge value={doc.status} />{' '}
+                {doc.extractedBy && (
+                  <span style={{ color: C.muted, fontSize: '0.75rem' }}>
+                    via {doc.extractedBy} · extraction cost <Money paise={doc.costPaise} />
+                  </span>
+                )}
+              </span>
+              <Btn
+                kind="ghost"
+                small
+                style={{ color: C.red, fontSize: '0.75rem' }}
+                onClick={() => void deleteDoc(doc.id)}
+              >
+                Remove
+              </Btn>
+            </div>
           }
         >
           {doc.extraction ? (
@@ -151,16 +237,16 @@ export function DocumentsPage() {
                 rows={[
                   [
                     <ConfidenceCell key="v" field={doc.extraction.vendorName} />,
-                    <ConfidenceCell key="g" field={doc.extraction.gstin} />,
-                    <ConfidenceCell key="n" field={doc.extraction.documentNumber} />,
-                    <ConfidenceCell key="d" field={doc.extraction.documentDate} />,
-                    <ConfidenceCell key="x" field={doc.extraction.taxablePaise} money />,
+                    <ConfidenceCell key="g" field={doc.extraction.gstin} optional />,
+                    <ConfidenceCell key="n" field={doc.extraction.documentNumber} optional />,
+                    <ConfidenceCell key="d" field={doc.extraction.documentDate} optional />,
+                    <ConfidenceCell key="x" field={doc.extraction.taxablePaise} money optional />,
                     <ConfidenceCell key="t" field={doc.extraction.totalPaise} money />,
                     doc.extraction.arithmeticOk === null
                       ? '—'
                       : doc.extraction.arithmeticOk
                         ? '✓ adds up'
-                        : '✗ mismatch',
+                        : '✗ mismatch (review)',
                   ],
                 ]}
               />
@@ -187,6 +273,33 @@ export function DocumentsPage() {
                       options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
                     />
                   </Field>
+                  {!doc.extraction.documentNumber.value && (
+                    <Field label="Bill no. (optional)">
+                      <input
+                        style={{ ...S.input, width: 140 }}
+                        placeholder="Auto / optional"
+                        value={manualBillNumber[doc.id] ?? ''}
+                        onChange={(e) =>
+                          setManualBillNumber((m) => ({ ...m, [doc.id]: e.target.value }))
+                        }
+                      />
+                    </Field>
+                  )}
+                  {!doc.extraction.taxablePaise.value && (
+                    <Field label="Taxable ₹ (optional)">
+                      <input
+                        type="number"
+                        style={{ ...S.input, width: 120 }}
+                        placeholder={
+                          doc.extraction.totalPaise.value ? 'Derived from total' : '0.00'
+                        }
+                        value={manualTaxable[doc.id] ?? ''}
+                        onChange={(e) =>
+                          setManualTaxable((m) => ({ ...m, [doc.id]: e.target.value }))
+                        }
+                      />
+                    </Field>
+                  )}
                   <Btn disabled={!partyId} onClick={() => void createBill(doc)}>
                     Create bill draft from this document
                   </Btn>

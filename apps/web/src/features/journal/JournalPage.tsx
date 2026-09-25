@@ -18,10 +18,10 @@ interface EntryDto {
   entryNumber: string;
   date: string;
   narration: string;
-  status: 'posted' | 'reversed';
+  status: 'posted' | 'returned';
   totalDebitPaise: number;
   lines: EntryLineDto[];
-  reversedByEntryId: string | null;
+  returnedByEntryId: string | null;
 }
 
 interface FormLine {
@@ -121,10 +121,10 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
   async function reverse(id: string) {
     setError(null);
     try {
-      await api('POST', `/api/v1/journal-entries/${id}/reverse`, { reason: 'reversed from UI' });
+      await api('POST', `/api/v1/journal-entries/${id}/return`, { reason: 'returned from UI' });
       await load();
     } catch (err) {
-      setError(err instanceof RequestError ? err.error.message : 'Reverse failed');
+      setError(err instanceof RequestError ? err.error.message : 'Return failed');
     }
   }
 
@@ -271,7 +271,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
               marginBottom: '0.65rem',
               background: C.panel,
               boxShadow: 'var(--shadow)',
-              opacity: entry.status === 'reversed' ? 0.6 : 1,
+              opacity: entry.status === 'returned' ? 0.6 : 1,
               transition: 'background 0.15s ease, box-shadow 0.15s ease',
             }}
           >
@@ -366,7 +366,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
                 {formatINR(entry.totalDebitPaise)}
               </span>
 
-              {entry.status === 'posted' && !entry.reversedByEntryId ? (
+              {entry.status === 'posted' && !entry.returnedByEntryId ? (
                 <button
                   type="button"
                   style={{
@@ -384,7 +384,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
                     void reverse(entry.id);
                   }}
                 >
-                  reverse
+                  return
                 </button>
               ) : (
                 <span

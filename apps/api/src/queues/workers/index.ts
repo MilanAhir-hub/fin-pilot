@@ -25,7 +25,10 @@ export function registerWorkers(): Worker[] {
   const transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: false,
+    secure: env.SMTP_SECURE ?? false,
+    ...(env.SMTP_USER && env.SMTP_PASS
+      ? { auth: { user: env.SMTP_USER, pass: env.SMTP_PASS } }
+      : {}),
   });
   const send = guardOutbound(
     'smtp-worker',

@@ -9,6 +9,7 @@ import { Payment } from '../models/Payment';
 import { partySnapshot, type PartyDoc, type PartySnapshot } from '../models/Party';
 import { accountRepo } from '../repositories/accountRepo';
 import { partyRepo } from '../repositories/partyRepo';
+import { accountService } from './accountService';
 import { AppError } from '../utils/AppError';
 
 export interface ImportResult {
@@ -18,6 +19,7 @@ export interface ImportResult {
 
 export const partyService = {
   async create(input: CreatePartyInput): Promise<PartyDoc> {
+    await accountService.ensureTemplate();
     const [ar, ap] = await Promise.all([
       accountRepo.findByCode('1130'),
       accountRepo.findByCode('2110'),

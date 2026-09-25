@@ -232,6 +232,31 @@ body {
     box-shadow 0.25s ease;
 }
 
+/* Elevate any card or container hosting an open dropdown above subsequent sibling cards */
+.fp-card.fp-card-active-dropdown,
+.fp-card:has(.fp-dropdown-wrapper.is-open),
+.fp-card:has([aria-expanded="true"]),
+.fp-card:has(.fp-dropdown-menu),
+section:has(.fp-dropdown-wrapper.is-open),
+section:has([aria-expanded="true"]) {
+  position: relative !important;
+  z-index: 1000 !important;
+}
+
+.fp-dropdown-wrapper {
+  position: relative;
+}
+
+.fp-dropdown-wrapper.is-open {
+  position: relative !important;
+  z-index: 99999 !important;
+}
+
+.fp-dropdown-menu {
+  position: absolute;
+  z-index: 99999 !important;
+}
+
 .fp-btn {
   border: none;
   border-radius: 8px;

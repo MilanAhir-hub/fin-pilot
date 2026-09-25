@@ -21,6 +21,7 @@ interface Item {
   sac?: string;
   gstRate: number;
   sellingPricePaise?: number;
+  purchasePricePaise?: number;
   unit?: string;
 }
 
@@ -97,6 +98,8 @@ function ItemForm({ onDone }: { onDone: () => void }) {
   const [kind, setKind] = useState<'service' | 'goods'>('service');
   const [code, setCode] = useState('');
   const [gstRate, setGstRate] = useState('18');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -105,14 +108,23 @@ function ItemForm({ onDone }: { onDone: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api('POST', '/api/v1/items', {
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         kind,
         gstRate: Number(gstRate),
         ...(kind === 'service' ? { sac: code.trim() } : { hsn: code.trim() }),
-      });
+      };
+      if (sellingPrice) {
+        payload.sellingPricePaise = Math.round(Number(sellingPrice) * 100);
+      }
+      if (purchasePrice) {
+        payload.purchasePricePaise = Math.round(Number(purchasePrice) * 100);
+      }
+      await api('POST', '/api/v1/items', payload);
       setName('');
       setCode('');
+      setSellingPrice('');
+      setPurchasePrice('');
       onDone();
     } catch (err) {
       setError(err);
@@ -159,6 +171,28 @@ function ItemForm({ onDone }: { onDone: () => void }) {
             value={gstRate}
             onChange={setGstRate}
             options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
+          />
+        </Field>
+        <Field label="Sales price (₹)">
+          <input
+            style={{ ...S.input, width: 120 }}
+            type="number"
+            min="0"
+            step="any"
+            value={sellingPrice}
+            onChange={(e) => setSellingPrice(e.target.value)}
+            placeholder="0.00"
+          />
+        </Field>
+        <Field label="Purchase price (₹)">
+          <input
+            style={{ ...S.input, width: 120 }}
+            type="number"
+            min="0"
+            step="any"
+            value={purchasePrice}
+            onChange={(e) => setPurchasePrice(e.target.value)}
+            placeholder="0.00"
           />
         </Field>
         <Btn disabled={busy}>Add</Btn>
@@ -348,12 +382,14 @@ export function PartiesPage() {
         <ItemForm onDone={items.reload} />
         <Err error={items.error} />
         <Tbl
-          head={['Name', 'Kind', 'HSN/SAC', 'GST rate']}
+          head={['Name', 'Kind', 'HSN/SAC', 'GST rate', 'Sales price', 'Purchase price']}
           rows={(items.data?.items ?? []).map((i) => [
             i.name,
             <Badge key="k" value={i.kind} />,
             i.sac ?? i.hsn ?? '—',
             `${i.gstRate}%`,
+            <Money key="sp" paise={i.sellingPricePaise ?? 0} />,
+            <Money key="pp" paise={i.purchasePricePaise ?? 0} />,
           ])}
         />
       </Card>

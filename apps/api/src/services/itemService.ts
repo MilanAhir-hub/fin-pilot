@@ -8,6 +8,7 @@ import { accountRepo } from '../repositories/accountRepo';
 import { companyRepo } from '../repositories/companyRepo';
 import { itemRepo } from '../repositories/itemRepo';
 import { requireCompanyContext } from '../plugins/tenantScope';
+import { accountService } from './accountService';
 import { AppError } from '../utils/AppError';
 import type { ImportResult } from './partyService';
 
@@ -29,6 +30,7 @@ async function assertHsnDigits(hsn: string | undefined): Promise<void> {
 export const itemService = {
   async create(input: CreateItemInput): Promise<ItemDoc> {
     await assertHsnDigits(input.hsn);
+    await accountService.ensureTemplate();
     const [income, expense, inventory] = await Promise.all([
       accountRepo.findByCode('4100'),
       accountRepo.findByCode('5110'),

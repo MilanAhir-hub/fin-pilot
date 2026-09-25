@@ -24,6 +24,7 @@ import { companyRepo } from '../repositories/companyRepo';
 import { itemRepo } from '../repositories/itemRepo';
 import { partyRepo } from '../repositories/partyRepo';
 import { requireCompanyContext } from '../plugins/tenantScope';
+import { accountService } from './accountService';
 import { subscriptionService } from './admin/subscriptionService';
 import { AppError } from '../utils/AppError';
 import { financialYear } from '../utils/financialYear';
@@ -131,6 +132,9 @@ async function glLinesFor(invoice: InvoiceDoc): Promise<JournalLineDraft[]> {
     ? await accountRepo.findById(party.receivableAccountId)
     : null;
   const arAccount = ar ?? (await account('1130', 'Accounts Receivable'));
+  if (party && !party.receivableAccountId && arAccount) {
+    await partyRepo.update(party._id, { receivableAccountId: arAccount._id });
+  }
 
   const glLines: JournalLineDraft[] = [
     {
@@ -187,6 +191,7 @@ async function glLinesFor(invoice: InvoiceDoc): Promise<JournalLineDraft[]> {
 
 export const invoiceService = {
   async createDraft(input: CreateInvoiceInput): Promise<InvoiceDoc> {
+    await accountService.ensureTemplate();
     await subscriptionService.assertInvoiceQuota(); // §32 Phase 23: 402 + upgrade path
     const totals = await computeTotals(input);
     const party = await partyRepo.findById(input.partyId);
@@ -253,6 +258,7 @@ export const invoiceService = {
   /** Issue: number + GL entry + status, one transaction (I6, §12.1). */
   async issue(id: string): Promise<InvoiceDoc> {
     const ctx = requireCompanyContext();
+    await accountService.ensureTemplate();
     return withTransaction(async (session) => {
       const invoice = await Invoice.findOne({ _id: id }).session(session);
       if (!invoice) throw new AppError('SYS_NOT_FOUND', 404);

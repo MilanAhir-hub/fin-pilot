@@ -48,11 +48,60 @@ export function Dropdown({
   'aria-label': ariaLabel,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
   const generatedId = useId();
   const dropdownId = id ?? generatedId;
+
+  // Elevate parent cards and containers above all sibling cards when open
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    // Detect if we should open upwards when close to viewport bottom
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    if (spaceBelow < 240 && spaceAbove > spaceBelow) {
+      setOpenUpwards(true);
+    } else {
+      setOpenUpwards(false);
+    }
+
+    // Elevate ancestor card and section elements so later cards don't overlap the dropdown
+    let el: HTMLElement | null = containerRef.current.parentElement;
+    const elevatedElements: Array<{ element: HTMLElement; prevZ: string; prevPos: string }> = [];
+
+    while (el && el !== document.body) {
+      if (
+        el.classList.contains('fp-card') ||
+        el.classList.contains('fp-tile') ||
+        el.tagName === 'SECTION' ||
+        el.tagName === 'FORM'
+      ) {
+        elevatedElements.push({
+          element: el,
+          prevZ: el.style.zIndex,
+          prevPos: el.style.position,
+        });
+        el.style.zIndex = '1000';
+        if (!el.style.position || el.style.position === 'static') {
+          el.style.position = 'relative';
+        }
+        el.classList.add('fp-card-active-dropdown');
+      }
+      el = el.parentElement;
+    }
+
+    return () => {
+      for (const item of elevatedElements) {
+        item.element.style.zIndex = item.prevZ;
+        item.element.style.position = item.prevPos;
+        item.element.classList.remove('fp-card-active-dropdown');
+      }
+    };
+  }, [isOpen]);
 
   // Normalize options from array prop or <option> children
   const parsedOptions: DropdownOption[] = useMemo(() => {
@@ -167,13 +216,17 @@ export function Dropdown({
     maxWidth: style?.maxWidth,
     boxSizing: 'border-box',
     margin: style?.margin,
-    zIndex: isOpen ? (style?.zIndex ?? 9999) : undefined,
+    zIndex: isOpen ? (style?.zIndex ?? 99999) : undefined,
   };
 
   const triggerHeight = style?.height ?? 52;
 
   return (
-    <div ref={containerRef} style={wrapperStyle} className={`fp-dropdown-wrapper ${className}`}>
+    <div
+      ref={containerRef}
+      style={wrapperStyle}
+      className={`fp-dropdown-wrapper ${isOpen ? 'is-open' : ''} ${className}`}
+    >
       {/* Hidden input for HTML form validation & submission */}
       <input
         type="hidden"
@@ -248,7 +301,8 @@ export function Dropdown({
           className="fp-dropdown-menu"
           style={{
             position: 'absolute',
-            top: 'calc(100% + 4px)',
+            top: openUpwards ? undefined : 'calc(100% + 4px)',
+            bottom: openUpwards ? 'calc(100% + 4px)' : undefined,
             left: 0,
             width: '100%',
             minWidth: style?.width && typeof style.width === 'number' && style.width < 140 ? 140 : '100%',
@@ -258,7 +312,7 @@ export function Dropdown({
             border: 'none',
             borderRadius: 10,
             boxShadow: 'var(--shadow-lift)',
-            zIndex: 9999,
+            zIndex: 99999,
             padding: '4px 0',
             margin: 0,
             listStyle: 'none',

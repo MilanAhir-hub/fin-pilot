@@ -7,10 +7,18 @@ import { getEnv } from '../config/env';
 import { logger } from '../config/logger';
 import { guardOutbound, mailLimiter } from '../integrations/limiters';
 
+export interface MailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+}
+
 export interface SentMail {
   to: string;
   subject: string;
   text: string;
+  html?: string;
+  attachments?: MailAttachment[];
 }
 
 const testOutbox: SentMail[] = [];
@@ -21,7 +29,10 @@ function getTransporter(): Transporter {
   transporter ??= nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: false,
+    secure: env.SMTP_SECURE ?? false,
+    ...(env.SMTP_USER && env.SMTP_PASS
+      ? { auth: { user: env.SMTP_USER, pass: env.SMTP_PASS } }
+      : {}),
   });
   return transporter;
 }
@@ -29,7 +40,10 @@ function getTransporter(): Transporter {
 // L5 (§19.7): SMTP is an outbound client like any other — limited + breakered
 let guardedSend: ((mail: SentMail) => Promise<unknown>) | null = null;
 
-export async function sendMail(mail: SentMail): Promise<void> {
+export async function sendMail(
+  mail: SentMail,
+  options?: { silent?: boolean },
+): Promise<void> {
   const env = getEnv();
   if (env.NODE_ENV === 'test') {
     testOutbox.push(mail);
@@ -41,8 +55,10 @@ export async function sendMail(mail: SentMail): Promise<void> {
   try {
     await guardedSend(mail);
   } catch (err) {
-    // Mail must never take down an auth flow — log and continue.
     logger.error({ err, to: mail.to, subject: mail.subject }, 'mail send failed');
+    if (!options?.silent) {
+      throw err;
+    }
   }
 }
 

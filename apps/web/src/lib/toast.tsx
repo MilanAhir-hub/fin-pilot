@@ -22,7 +22,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { onApiError } from './api';
-import { describeError, errorToClipboardText, type ToastKind } from './errors';
+import { describeError, type ToastKind } from './errors';
 
 export interface ToastOptions {
   kind?: ToastKind;
@@ -57,12 +57,12 @@ export interface ToastApi {
   clear(): void;
 }
 
-/** Errors stay put long enough to read and copy; good news gets out of the way. */
+/** Errors stay put long enough to read comfortably; good news gets out of the way. */
 const DEFAULT_DURATION: Record<ToastKind, number> = {
-  error: 9000,
-  warning: 8000,
+  error: 6000,
+  warning: 6000,
   success: 3500,
-  info: 5000,
+  info: 4500,
 };
 
 const MAX_VISIBLE = 5;
@@ -259,8 +259,6 @@ function ToastViewport({
 }
 
 function ToastItem({ toast, onDismiss }: { toast: ToastRecord; onDismiss: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [paused, setPaused] = useState(false);
 
   const { id, duration, nonce, leaving } = toast;
@@ -274,25 +272,23 @@ function ToastItem({ toast, onDismiss }: { toast: ToastRecord; onDismiss: (id: s
   }, [id, duration, nonce, paused, leaving, onDismiss]);
 
   const accent = ACCENT[toast.kind];
-
-  async function copy() {
-    const text = errorToClipboardText({
-      kind: toast.kind,
-      title: toast.title,
-      message: toast.message ?? '',
-      code: toast.code,
-      details: toast.details,
-    });
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* clipboard blocked — the text is on screen anyway */
-    }
-  }
-
   const isProblem = toast.kind === 'error' || toast.kind === 'warning';
+
+  // Format simple message: if title is a generic status (like "Something went wrong" or "Bad request")
+  // and there is a specific error message, show only that error message.
+  const isGenericTitle =
+    !toast.title ||
+    toast.title === 'Something went wrong' ||
+    toast.title === 'Bad request' ||
+    toast.title === 'The server hit an error' ||
+    toast.title.startsWith('Request failed');
+
+  const mainText =
+    isGenericTitle && toast.message ? toast.message : toast.title || toast.message || '';
+  const subText =
+    isGenericTitle || toast.title === toast.message || !toast.message
+      ? undefined
+      : toast.message;
 
   return (
     <div
@@ -311,27 +307,11 @@ function ToastItem({ toast, onDismiss }: { toast: ToastRecord; onDismiss: (id: s
 
       <div style={{ minWidth: 0, flex: 1 }}>
         <div className="fp-toast-head">
-          <strong className="fp-toast-title">{toast.title}</strong>
+          <strong className="fp-toast-title">{mainText}</strong>
           {toast.count > 1 && <span className="fp-toast-count">×{toast.count}</span>}
-          {toast.code && <code className="fp-toast-code">{toast.code}</code>}
         </div>
 
-        {toast.message && <p className="fp-toast-msg">{toast.message}</p>}
-
-        {toast.details && (
-          <>
-            <button type="button" className="fp-toast-link" onClick={() => setOpen((v) => !v)}>
-              {open ? 'Hide details' : 'Show details'}
-            </button>
-            {open && <pre className="fp-toast-details">{toast.details}</pre>}
-          </>
-        )}
-
-        {isProblem && (
-          <button type="button" className="fp-toast-link" onClick={() => void copy()}>
-            {copied ? 'Copied ✓' : 'Copy error'}
-          </button>
-        )}
+        {subText && <p className="fp-toast-msg">{subText}</p>}
       </div>
 
       <button

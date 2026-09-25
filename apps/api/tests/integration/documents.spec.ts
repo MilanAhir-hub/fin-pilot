@@ -139,4 +139,80 @@ describe('the extraction cascade (§16)', () => {
       .send({ partyId: vendorId, gstRate: 18 })
       .expect(409);
   });
+
+  it('marks missing fields as not_found and optional, and allows bill draft creation without errors', async () => {
+    // A bill without GSTIN, without explicit bill number, and without taxable line
+    const flatBill = `Local Corner Store
+Date: 12/08/2026
+Total: 5,000.00`;
+
+    const res = await request(app)
+      .post('/api/v1/documents')
+      .set(auth())
+      .send({
+        filename: 'receipt.pdf',
+        mimeType: 'application/pdf+text',
+        contentBase64: b64(flatBill),
+      })
+      .expect(201);
+
+    const ex = res.body.data.document.extraction;
+    expect(ex.gstin.value).toBeNull();
+    expect(ex.gstin.status).toBe('not_found');
+    expect(ex.gstin.optional).toBe(true);
+
+    expect(ex.documentNumber.value).toBeNull();
+    expect(ex.documentNumber.status).toBe('not_found');
+    expect(ex.documentNumber.optional).toBe(true);
+
+    expect(ex.taxablePaise.value).toBeNull();
+    expect(ex.taxablePaise.status).toBe('not_found');
+    expect(ex.taxablePaise.optional).toBe(true);
+
+    expect(ex.totalPaise.value).toBe(500_000);
+
+    // Bill draft creation should succeed smoothly, not 422
+    const billRes = await request(app)
+      .post(`/api/v1/bills/from-document/${res.body.data.document.id}`)
+      .set(idem())
+      .send({ partyId: vendorId, gstRate: 18 })
+      .expect(201);
+
+    const bill = billRes.body.data.bill;
+    expect(bill.vendorBillNumber).toMatch(/^BILL-/);
+    expect(bill.status).toBe('draft');
+  });
+
+  it('marks uncertain or mismatched values for review instead of confident assignment', async () => {
+    const uncertainDoc = `TAX INVOICE
+Acme Hardware
+Invoice No: Date
+Date: 99/99/2026
+Taxable Value: 10,000.00
+Total: 5,000.00`;
+
+    const res = await request(app)
+      .post('/api/v1/documents')
+      .set(auth())
+      .send({
+        filename: 'uncertain.pdf',
+        mimeType: 'application/pdf+text',
+        contentBase64: b64(uncertainDoc),
+      })
+      .expect(201);
+
+    const ex = res.body.data.document.extraction;
+    // Vendor should not be "TAX INVOICE", it should pick Acme Hardware
+    expect(ex.vendorName.value).toBe('Acme Hardware');
+    // "Date" should not be assigned as documentNumber, marked for review
+    expect(ex.documentNumber.value).toBeNull();
+    expect(ex.documentNumber.status).toBe('review');
+    // Invalid date should not be accepted as valid
+    expect(ex.documentDate.value).toBeNull();
+    expect(ex.documentDate.status).toBe('review');
+    // Inverted taxable > total should be flagged for review
+    expect(ex.taxablePaise.value).toBeNull();
+    expect(ex.taxablePaise.status).toBe('review');
+    expect(ex.totalPaise.status).toBe('review');
+  });
 });

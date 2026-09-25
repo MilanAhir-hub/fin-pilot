@@ -47,6 +47,14 @@ documentRoutes.get(
     ok(res, { document: dto((await documentService.get(String(req.params.id))) as never) });
   }),
 );
+documentRoutes.delete(
+  '/:id',
+  authorize('expense:submit'),
+  asyncHandler(async (req: Request, res: Response) => {
+    await documentService.delete(String(req.params.id));
+    ok(res, { deleted: true });
+  }),
+);
 
 export const billFromDocumentRoutes = Router();
 billFromDocumentRoutes.use(authenticate, tenantResolve('header'));
@@ -54,7 +62,14 @@ billFromDocumentRoutes.post(
   '/from-document/:documentId',
   authorize('invoice:create'),
   idempotency,
-  validate(z.object({ partyId: z.string().length(24), gstRate: z.number() })),
+  validate(
+    z.object({
+      partyId: z.string().length(24),
+      gstRate: z.number(),
+      vendorBillNumber: z.string().min(1).max(100).optional(),
+      taxablePaise: z.number().nonnegative().optional(),
+    }),
+  ),
   asyncHandler(async (req: Request, res: Response) => {
     const bill = await documentService.createBill(String(req.params.documentId), req.body);
     ok(res, { bill: { ...bill, id: String(bill._id) } }, 201);

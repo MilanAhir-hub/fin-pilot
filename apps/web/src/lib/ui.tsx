@@ -383,8 +383,10 @@ export function Err({ error }: { error: unknown }) {
   if (!error) return null;
   const msg =
     error instanceof RequestError
-      ? `${error.error.code}: ${error.error.message}${error.error.details ? ' — ' + JSON.stringify(error.error.details) : ''}`
-      : String(error);
+      ? error.error.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
   return (
     <p
       className="fp-msg"

@@ -14,14 +14,23 @@ import {
 } from '../../lib/ui';
 import { Dropdown } from '../../components/Dropdown';
 
+interface BillLine {
+  itemId?: string | null;
+  description: string;
+  qty: number;
+  ratePaise: number;
+  gstRate: number;
+}
 interface BillRow {
   id: string;
+  partyId?: string;
   vendorBillNumber: string;
   partySnapshot?: { name: string };
   billDate: string;
   status: string;
   grandTotalPaise: number;
   itcEligiblePaise?: number;
+  lines?: BillLine[];
 }
 interface ExpenseRow {
   id: string;
@@ -35,11 +44,37 @@ interface Party {
   name: string;
   type: string[];
 }
+interface Item {
+  id: string;
+  name: string;
+  kind: 'goods' | 'service';
+  hsn?: string;
+  sac?: string;
+  gstRate: number;
+  sellingPricePaise?: number;
+  purchasePricePaise?: number;
+  unit?: string;
+}
 interface Account {
   id: string;
   code: string;
   name: string;
   type: string;
+}
+
+function getNextBillNumber(existingBills: BillRow[]): string {
+  let maxSeq = 1024;
+  for (const b of existingBills) {
+    const num = b.vendorBillNumber?.trim() || '';
+    const match = num.match(/^BILL[-_]?(\d+)$/i);
+    if (match && match[1]) {
+      const val = parseInt(match[1], 10);
+      if (val > maxSeq) {
+        maxSeq = val;
+      }
+    }
+  }
+  return `BILL-${maxSeq + 1}`;
 }
 
 function getVendorCategory(name: string, party?: Party): string {
@@ -185,15 +220,21 @@ function ActionMenu({
 
 function NewBill({
   vendors,
+  items = [],
+  existingBills = [],
   onDone,
   formRef,
 }: {
   vendors: Party[];
+  items?: Item[];
+  existingBills?: BillRow[];
   onDone: () => void;
   formRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const [partyId, setPartyId] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState('');
   const [number, setNumber] = useState('');
+  const [isManualNumber, setIsManualNumber] = useState(false);
   const [date, setDate] = useState(today());
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -201,9 +242,111 @@ function NewBill({
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
+  // Auto-generate BILL-1025 or next sequence on load or reset
+  useEffect(() => {
+    if (!isManualNumber && (!number || number.startsWith('BILL-'))) {
+      setNumber(getNextBillNumber(existingBills));
+    }
+  }, [existingBills, isManualNumber]);
+
+  // Warning if duplicate bill number entered
+  const duplicateBill = useMemo(() => {
+    const trimmed = number.trim().toLowerCase();
+    if (!trimmed) return null;
+    return existingBills.find(
+      (b) => (b.vendorBillNumber?.trim() || '').toLowerCase() === trimmed,
+    );
+  }, [existingBills, number]);
+
+  function applyItem(item: Item) {
+    setSelectedItemId(item.id);
+    setDescription(item.name);
+    if (item.purchasePricePaise !== undefined && item.purchasePricePaise > 0) {
+      setAmount((item.purchasePricePaise / 100).toFixed(2).replace(/\.00$/, ''));
+    } else if (item.sellingPricePaise !== undefined && item.sellingPricePaise > 0) {
+      setAmount((item.sellingPricePaise / 100).toFixed(2).replace(/\.00$/, ''));
+    }
+    if (item.gstRate !== undefined) {
+      setGstRate(String(item.gstRate));
+    }
+  }
+
+  function handleVendorChange(selectedPartyId: string) {
+    setPartyId(selectedPartyId);
+    if (!selectedPartyId) {
+      setSelectedItemId('');
+      return;
+    }
+
+    // Find items related to this vendor from past bills
+    const vendorBills = existingBills.filter((b) => b.partyId === selectedPartyId);
+    const pastItemIds = new Set<string>();
+    const pastDescs: string[] = [];
+    for (const b of vendorBills) {
+      if (b.lines) {
+        for (const l of b.lines) {
+          if (l.itemId) pastItemIds.add(String(l.itemId));
+          if (l.description) pastDescs.push(l.description);
+        }
+      }
+    }
+
+    // Match with item master
+    let matchedItem = items.find((it) => pastItemIds.has(it.id));
+    if (!matchedItem && pastDescs.length > 0) {
+      const descLower = new Set(pastDescs.map((d) => d.toLowerCase().trim()));
+      matchedItem = items.find((it) => descLower.has(it.name.toLowerCase().trim()));
+    }
+
+    const firstBill = vendorBills[0];
+    const lastLine = firstBill?.lines?.[0];
+
+    if (matchedItem) {
+      applyItem(matchedItem);
+    } else if (lastLine) {
+      setSelectedItemId(lastLine.itemId ? String(lastLine.itemId) : '');
+      setDescription(lastLine.description || '');
+      if (lastLine.ratePaise) {
+        setAmount((lastLine.ratePaise / 100).toFixed(2).replace(/\.00$/, ''));
+      }
+      if (lastLine.gstRate !== undefined) {
+        setGstRate(String(lastLine.gstRate));
+      }
+    } else if (items.length > 0 && items[0]) {
+      applyItem(items[0]);
+    }
+  }
+
+  function handleItemChange(val: string) {
+    setSelectedItemId(val);
+    const it = items.find((i) => i.id === val);
+    if (it) {
+      applyItem(it);
+    }
+  }
+
+  const itemOptions = useMemo(() => {
+    const opts: Array<{ value: string; label: string }> = [
+      { value: '', label: '— Select item —' },
+    ];
+    for (const it of items) {
+      const priceStr =
+        it.purchasePricePaise && it.purchasePricePaise > 0
+          ? ` · ₹${(it.purchasePricePaise / 100).toFixed(2).replace(/\.00$/, '')}`
+          : '';
+      opts.push({
+        value: it.id,
+        label: `${it.name}${priceStr} (${it.gstRate}%)`,
+      });
+    }
+    return opts;
+  }, [items]);
+
   function resetForm() {
     setPartyId('');
-    setNumber('');
+    setSelectedItemId('');
+    setIsManualNumber(false);
+    setNumber(getNextBillNumber(existingBills));
     setDate(today());
     setDescription('');
     setAmount('');
@@ -221,10 +364,18 @@ function NewBill({
         vendorBillNumber: number,
         billDate: date,
         lines: [
-          { description, qty: 1, ratePaise: rupeesToPaise(amount), gstRate: Number(gstRate) },
+          {
+            itemId: selectedItemId || undefined,
+            description: description || 'Item',
+            qty: 1,
+            ratePaise: rupeesToPaise(amount),
+            gstRate: Number(gstRate),
+          },
         ],
       });
-      setNumber('');
+      setIsManualNumber(false);
+      setNumber(getNextBillNumber(existingBills));
+      setSelectedItemId('');
       setDescription('');
       setAmount('');
       onDone();
@@ -312,17 +463,18 @@ function NewBill({
       )}
 
       <form onSubmit={submit}>
+        {/* Row 1: Document & Vendor Details */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: 16,
-            alignItems: 'flex-end',
-            marginBottom: '20px',
+            alignItems: 'flex-start',
+            marginBottom: '18px',
           }}
         >
           {/* Vendor */}
-          <div style={{ minWidth: 170 }}>
+          <div>
             <label
               style={{
                 display: 'block',
@@ -343,7 +495,7 @@ function NewBill({
                 fontSize: '0.88rem',
               }}
               value={partyId}
-              onChange={setPartyId}
+              onChange={handleVendorChange}
               placeholder="— Select vendor —"
               required
               options={vendors.map((p) => ({ value: p.id, label: p.name }))}
@@ -351,7 +503,7 @@ function NewBill({
           </div>
 
           {/* Vendor bill no. */}
-          <div style={{ minWidth: 120 }}>
+          <div>
             <label
               style={{
                 display: 'block',
@@ -365,15 +517,48 @@ function NewBill({
             </label>
             <input
               className="fp-input-modern"
-              placeholder="e.g. INV-001"
+              placeholder="e.g. BILL-1025"
               value={number}
-              onChange={(e) => setNumber(e.target.value)}
+              onChange={(e) => {
+                setIsManualNumber(true);
+                setNumber(e.target.value);
+              }}
               required
             />
+            {duplicateBill && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  marginTop: 6,
+                  color: '#F59E0B',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>
+                  Warning: Bill &ldquo;{duplicateBill.vendorBillNumber}&rdquo; already exists
+                  {duplicateBill.partySnapshot?.name ? ` (${duplicateBill.partySnapshot.name})` : ''}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Bill date */}
-          <div style={{ minWidth: 130 }}>
+          <div>
             <label
               style={{
                 display: 'block',
@@ -392,9 +577,48 @@ function NewBill({
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
+        </div>
+
+        {/* Row 2: Item Line & Pricing Details */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: 16,
+            alignItems: 'flex-start',
+            marginBottom: '22px',
+          }}
+        >
+          {/* Item */}
+          <div style={{ minWidth: 180 }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                color: 'var(--text)',
+                marginBottom: 6,
+              }}
+            >
+              Item (auto-fills price & GST)
+            </label>
+            <Dropdown
+              style={{
+                height: 44,
+                background: 'var(--panel-2)',
+                border: 'none',
+                borderRadius: 9,
+                fontSize: '0.88rem',
+              }}
+              value={selectedItemId}
+              onChange={handleItemChange}
+              placeholder="— Select item —"
+              options={itemOptions}
+            />
+          </div>
 
           {/* Description (optional) */}
-          <div style={{ minWidth: 170, flex: 1.5 }}>
+          <div style={{ minWidth: 180, flex: 1.5 }}>
             <label
               style={{
                 display: 'block',
@@ -415,8 +639,8 @@ function NewBill({
             />
           </div>
 
-          {/* Taxable amount (₹) */}
-          <div style={{ minWidth: 110 }}>
+          {/* Purchase Price (₹) */}
+          <div style={{ minWidth: 130 }}>
             <label
               style={{
                 display: 'block',
@@ -426,7 +650,7 @@ function NewBill({
                 marginBottom: 6,
               }}
             >
-              Taxable amount (₹)
+              Purchase Price (₹)
             </label>
             <input
               className="fp-input-modern"
@@ -685,6 +909,7 @@ export function BillsPage() {
   const expenses = useLoad(() => api<{ expenses: ExpenseRow[] }>('GET', '/api/v1/expenses'));
   const parties = useLoad(() => api<{ parties: Party[] }>('GET', '/api/v1/parties'));
   const accounts = useLoad(() => api<{ accounts: Account[] }>('GET', '/api/v1/accounts'));
+  const items = useLoad(() => api<{ items: Item[] }>('GET', '/api/v1/items'));
   const [error, setError] = useState<unknown>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const newBillRef = useRef<HTMLDivElement>(null);
@@ -795,7 +1020,16 @@ export function BillsPage() {
       </div>
 
       {/* "Record a new bill" Section */}
-      <NewBill vendors={vendors} onDone={bills.reload} formRef={newBillRef} />
+      <NewBill
+        vendors={vendors}
+        items={items.data?.items ?? []}
+        existingBills={bills.data?.bills ?? []}
+        onDone={() => {
+          bills.reload();
+          items.reload();
+        }}
+        formRef={newBillRef}
+      />
 
       {/* "Vendor bills" Section */}
       <div style={{ marginBottom: '40px' }}>
