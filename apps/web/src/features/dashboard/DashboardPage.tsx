@@ -351,7 +351,8 @@ export function DashboardPage() {
                     title={JSON.stringify(comp.drivers, null, 2)}
                     style={{
                       fontSize: '0.78rem',
-                      border: `1px solid ${C.border}`,
+                      border: 'none',
+                      background: C.panel2,
                       borderRadius: 999,
                       padding: '0.2rem 0.65rem',
                       color: comp.score >= 70 ? C.green : comp.score >= 40 ? C.amber : C.red,

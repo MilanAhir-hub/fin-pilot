@@ -18,6 +18,7 @@ import { companyRepo } from '../repositories/companyRepo';
 import { itemRepo } from '../repositories/itemRepo';
 import { partyRepo } from '../repositories/partyRepo';
 import { requireCompanyContext } from '../plugins/tenantScope';
+import { accountService } from './accountService';
 import { AppError } from '../utils/AppError';
 import { withTransaction } from '../utils/withTransaction';
 
@@ -30,6 +31,7 @@ async function account(code: string) {
 export const billService = {
   async create(input: CreateBillInput): Promise<BillDoc> {
     const ctx = requireCompanyContext();
+    await accountService.ensureTemplate();
     const [company, party] = await Promise.all([
       companyRepo.findById(ctx.companyId),
       partyRepo.findById(input.partyId),
@@ -96,6 +98,7 @@ export const billService = {
   /** Approve → §12.2 purchase posting, one transaction. */
   async approve(id: string): Promise<BillDoc> {
     const ctx = requireCompanyContext();
+    await accountService.ensureTemplate();
     return withTransaction(async (session) => {
       const bill = await Bill.findOne({ _id: id }).session(session);
       if (!bill) throw new AppError('SYS_NOT_FOUND', 404);
@@ -152,8 +155,12 @@ export const billService = {
       const ap = party?.payableAccountId
         ? await accountRepo.findById(party.payableAccountId)
         : null;
+      const apAccount = ap ?? (await account('2110'));
+      if (party && !party.payableAccountId && apAccount) {
+        await partyRepo.update(party._id, { payableAccountId: apAccount._id });
+      }
       glLines.push({
-        accountId: (ap ?? (await account('2110')))._id,
+        accountId: apAccount._id,
         creditPaise: bill.grandTotalPaise,
         partyId: bill.partyId,
         description: `Bill ${bill.vendorBillNumber}`,

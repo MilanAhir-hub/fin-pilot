@@ -23,6 +23,7 @@ import { accountRepo } from '../repositories/accountRepo';
 import { companyRepo } from '../repositories/companyRepo';
 import { partyRepo } from '../repositories/partyRepo';
 import { requireCompanyContext } from '../plugins/tenantScope';
+import { accountService } from './accountService';
 import { AppError } from '../utils/AppError';
 import { financialYear } from '../utils/financialYear';
 import { withTransaction } from '../utils/withTransaction';
@@ -73,6 +74,7 @@ export const paymentService = {
   async create(input: CreatePaymentInput, actorOverride?: Types.ObjectId): Promise<PaymentDoc> {
     const ctx = requireCompanyContext();
     const actor = actorOverride ?? ctx.userId!;
+    await accountService.ensureTemplate();
     return withTransaction(async (session) => {
       const [company, party, deposit] = await Promise.all([
         companyRepo.findById(ctx.companyId),

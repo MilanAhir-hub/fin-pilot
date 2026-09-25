@@ -9,6 +9,7 @@ import { Types } from 'mongoose';
 import { BankAccount, type BankAccountDoc } from '../models/BankAccount';
 import { BankTransaction, txnFingerprint } from '../models/BankTransaction';
 import { accountRepo } from '../repositories/accountRepo';
+import { accountService } from './accountService';
 import { AppError } from '../utils/AppError';
 
 export interface ColumnMapping {
@@ -136,6 +137,7 @@ export const bankingService = {
     accountNumberMasked?: string;
     ifsc?: string;
   }): Promise<BankAccountDoc> {
+    await accountService.ensureTemplate();
     const ledger = await accountRepo.findByCode('1120');
     if (!ledger) throw new AppError('LEDGER_ACCOUNT_INACTIVE', 422, { missing: '1120' });
     return BankAccount.create({ ...input, ledgerAccountId: ledger._id, source: 'manual' }).then(

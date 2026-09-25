@@ -1,7 +1,7 @@
 /** Team members + invites (§32 Phase 3). Roles are bags of permissions. */
 import { useState } from 'react';
 import { api, getCompanyId } from '../../lib/api';
-import { Badge, Btn, Card, Err, Field, Row, S, Tbl, useLoad } from '../../lib/ui';
+import { Badge, Btn, Card, Dropdown, Err, Field, Row, S, Tbl, useLoad } from '../../lib/ui';
 
 interface Member {
   userId: string;
@@ -54,13 +54,15 @@ export function MembersPage() {
             />
           </Field>
           <Field label="Role">
-            <select style={S.input} value={roleKey} onChange={(e) => setRoleKey(e.target.value)}>
-              {INVITABLE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              style={{ ...S.input, minWidth: 160 }}
+              value={roleKey}
+              onChange={setRoleKey}
+              options={INVITABLE_ROLES.map((r) => ({
+                value: r,
+                label: r.replace(/_/g, ' '),
+              }))}
+            />
           </Field>
           <Btn>Invite</Btn>
         </Row>

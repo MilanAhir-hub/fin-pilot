@@ -48,3 +48,4 @@ invoiceRoutes.post(
   asyncHandler(ctrl.cancel),
 );
 invoiceRoutes.post('/:id/send', authorize('invoice:create'), asyncHandler(ctrl.send));
+invoiceRoutes.get('/:id/pdf', authorize('report:read'), asyncHandler(ctrl.pdf));

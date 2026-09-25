@@ -3,7 +3,14 @@
  * send / cancel. Totals are SERVER-computed (I5) — this form only ever sends
  * qty, rate and GST rate.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Cancel01Icon,
+  CheckmarkCircle01Icon,
+  Mail01Icon,
+  ViewIcon,
+} from '@hugeicons/core-free-icons';
 import { GST_STATE_CODES } from '@finpilot/shared';
 import { api } from '../../lib/api';
 import {
@@ -12,12 +19,11 @@ import {
   C,
   Card,
   Err,
-  Field,
   Money,
   Row,
-  S,
   Tbl,
   dateStr,
+  Dropdown,
   rupeesToPaise,
   today,
   useLoad,
@@ -83,23 +89,67 @@ interface Party {
   email?: string;
 }
 
+interface Item {
+  id: string;
+  name: string;
+  gstRate: number;
+  sellingPricePaise?: number;
+  purchasePricePaise?: number;
+  unit?: string;
+  hsn?: string;
+}
+
 interface LineDraft {
+  itemId?: string;
   description: string;
   qty: string;
   rateRupees: string;
   gstRate: string;
 }
 
-function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void }) {
+function NewInvoice({
+  parties,
+  items = [],
+  existingInvoices = [],
+  onDone,
+}: {
+  parties: Party[];
+  items?: Item[];
+  existingInvoices?: InvoiceRow[];
+  onDone: () => void;
+}) {
   const [partyId, setPartyId] = useState('');
   const [issueDate, setIssueDate] = useState(today());
   const [lines, setLines] = useState<LineDraft[]>([
-    { description: '', qty: '1', rateRupees: '', gstRate: '18' },
+    { itemId: '', description: '', qty: '1', rateRupees: '', gstRate: '18' },
   ]);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
   const customers = parties.filter((p) => p.type.includes('customer'));
+
+  const itemOptions = useMemo(() => {
+    const opts: Array<{ value: string; label: string }> = [
+      { value: '', label: '— Select existing item —' },
+    ];
+    for (const it of items) {
+      const price =
+        it.sellingPricePaise && it.sellingPricePaise > 0
+          ? it.sellingPricePaise
+          : it.purchasePricePaise && it.purchasePricePaise > 0
+            ? it.purchasePricePaise
+            : null;
+      const priceStr =
+        price !== null
+          ? ` · ₹${(price / 100).toFixed(2).replace(/\.00$/, '')}`
+          : '';
+      opts.push({
+        value: it.id,
+        label: `${it.name}${priceStr} (${it.gstRate}%)`,
+      });
+    }
+    return opts;
+  }, [items]);
 
   function setLine(i: number, patch: Partial<LineDraft>) {
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -107,6 +157,81 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
 
   function removeLine(i: number) {
     setLines((ls) => ls.filter((_, j) => j !== i));
+  }
+
+  function handleItemSelect(i: number, selectedItemId: string) {
+    if (!selectedItemId) {
+      setLine(i, { itemId: '' });
+      return;
+    }
+    const it = items.find((item) => item.id === selectedItemId);
+    if (!it) return;
+
+    const patch: Partial<LineDraft> = {
+      itemId: it.id,
+      description: it.name,
+      gstRate: String(it.gstRate ?? 18),
+    };
+    if (it.sellingPricePaise !== undefined && it.sellingPricePaise > 0) {
+      patch.rateRupees = (it.sellingPricePaise / 100).toFixed(2).replace(/\.00$/, '');
+    } else if (it.purchasePricePaise !== undefined && it.purchasePricePaise > 0) {
+      patch.rateRupees = (it.purchasePricePaise / 100).toFixed(2).replace(/\.00$/, '');
+    }
+    setLine(i, patch);
+  }
+
+  function handleCustomerChange(selectedPartyId: string) {
+    setPartyId(selectedPartyId);
+    if (!selectedPartyId) return;
+
+    // Auto-fill from customer's previous invoice if first line is untouched
+    const firstLine = lines[0];
+    if (
+      lines.length === 1 &&
+      firstLine &&
+      !firstLine.description &&
+      !firstLine.rateRupees &&
+      !firstLine.itemId
+    ) {
+      const cust = parties.find((p) => p.id === selectedPartyId);
+      if (cust) {
+        const customerInvoices = existingInvoices.filter(
+          (inv) => inv.partySnapshot?.name?.toLowerCase() === cust.name.toLowerCase(),
+        );
+        const pastItemIds = new Set<string>();
+        const pastDescs: string[] = [];
+        for (const inv of customerInvoices) {
+          if (inv.lines) {
+            for (const l of inv.lines) {
+              const lAny = l as unknown as { itemId?: string };
+              if (lAny.itemId) pastItemIds.add(String(lAny.itemId));
+              if (l.description) pastDescs.push(l.description);
+            }
+          }
+        }
+        let matched = items.find((it) => pastItemIds.has(it.id));
+        if (!matched && pastDescs.length > 0) {
+          const descLower = new Set(pastDescs.map((d) => d.toLowerCase().trim()));
+          matched = items.find((it) => descLower.has(it.name.toLowerCase().trim()));
+        }
+        if (matched) {
+          handleItemSelect(0, matched.id);
+        }
+      }
+    }
+  }
+
+  function calculateLineTotal(line: LineDraft) {
+    const qty = Number(line.qty) || 0;
+    const rate = Number(line.rateRupees) || 0;
+    const gst = Number(line.gstRate) || 0;
+    const taxable = qty * rate;
+    const tax = taxable * (gst / 100);
+    const total = taxable + tax;
+    return total.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
 
   async function submit(e: React.FormEvent) {
@@ -147,13 +272,14 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
         partyId,
         issueDate,
         lines: filledLines.map((l) => ({
+          itemId: l.itemId ? l.itemId : undefined,
           description: l.description.trim(),
           qty: Number(l.qty) || 1,
           ratePaise: rupeesToPaise(l.rateRupees),
           gstRate: Number(l.gstRate),
         })),
       });
-      setLines([{ description: '', qty: '1', rateRupees: '', gstRate: '18' }]);
+      setLines([{ itemId: '', description: '', qty: '1', rateRupees: '', gstRate: '18' }]);
       onDone();
     } catch (err) {
       setError(err);
@@ -164,112 +290,381 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
 
   return (
     <form onSubmit={submit}>
-      <Row>
-        <Field label="Customer">
-          <select
-            style={S.input}
-            value={partyId}
-            onChange={(e) => setPartyId(e.target.value)}
-            required
+      {/* Row 1: Document & Customer Details */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: 16,
+          alignItems: 'flex-start',
+          marginBottom: '20px',
+        }}
+      >
+        <div>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: 'var(--text)',
+              marginBottom: 6,
+            }}
           >
-            <option value="">— pick —</option>
-            {customers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Issue date">
+            Customer
+          </label>
+          <Dropdown
+            style={{
+              height: 44,
+              background: 'var(--panel-2)',
+              border: 'none',
+              borderRadius: 9,
+              fontSize: '0.88rem',
+            }}
+            value={partyId}
+            onChange={handleCustomerChange}
+            placeholder="— Select customer —"
+            required
+            options={customers.map((p) => ({ value: p.id, label: p.name }))}
+          />
+        </div>
+
+        <div>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: 'var(--text)',
+              marginBottom: 6,
+            }}
+          >
+            Issue date
+          </label>
           <input
-            style={S.input}
+            className="fp-input-modern"
+            style={{ width: '100%' }}
             type="date"
             value={issueDate}
             onChange={(e) => setIssueDate(e.target.value)}
+            required
           />
-        </Field>
-      </Row>
-      {lines.map((line, i) => (
-        <Row key={i}>
-          <Field label={`Line ${i + 1} description`}>
-            <input
-              style={{ ...S.input, width: 240 }}
-              value={line.description}
-              onChange={(e) => setLine(i, { description: e.target.value })}
-              placeholder="e.g. Consulting"
-            />
-          </Field>
-          <Field label="Qty">
-            <input
-              style={{ ...S.input, width: 70 }}
-              value={line.qty}
-              onChange={(e) => setLine(i, { qty: e.target.value })}
-            />
-          </Field>
-          <Field label="Rate (₹)">
-            <input
-              style={{ ...S.input, width: 110 }}
-              value={line.rateRupees}
-              onChange={(e) => setLine(i, { rateRupees: e.target.value })}
-              placeholder="5000"
-            />
-          </Field>
-          <Field label="GST %">
-            <select
-              style={{ ...S.input, width: 80 }}
-              value={line.gstRate}
-              onChange={(e) => setLine(i, { gstRate: e.target.value })}
-            >
-              {['0', '5', '18', '40'].map((r) => (
-                <option key={r} value={r}>
-                  {r}%
-                </option>
-              ))}
-            </select>
-          </Field>
-          {lines.length > 1 && (
-            <button
-              type="button"
-              title="Remove line"
-              onClick={() => removeLine(i)}
+        </div>
+      </div>
+
+      {/* Row 2: Line Items Section */}
+      <div style={{ marginBottom: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 10,
+          }}
+        >
+          <label
+            style={{
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              color: 'var(--text)',
+            }}
+          >
+            Line Items
+          </label>
+          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+            Select an existing item to auto-fetch selling price and GST %
+          </span>
+        </div>
+
+        {lines.map((line, i) => (
+          <div
+            key={i}
+            style={{
+              background: 'var(--panel-2)',
+              borderRadius: 12,
+              padding: '16px',
+              marginBottom: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+            }}
+          >
+            {/* Line item header */}
+            <div
               style={{
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                color: 'var(--red)',
-                cursor: 'pointer',
-                padding: '7px 12px',
-                fontSize: '14px',
-                fontWeight: 600,
-                alignSelf: 'flex-end',
-                marginBottom: 6,
-                transition: 'background-color 0.2s',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 12,
               }}
             >
-              ✕
-            </button>
-          )}
-          {i === lines.length - 1 && (
-            <Btn
-              small
-              kind="ghost"
-              type="button"
-              onClick={() =>
-                setLines((ls) => [
-                  ...ls,
-                  { description: '', qty: '1', rateRupees: '', gstRate: '18' },
-                ])
-              }
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    background: 'rgba(255, 68, 4, 0.15)',
+                    color: 'var(--accent, #FF4404)',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Item #{i + 1}
+                </span>
+              </div>
+              {lines.length > 1 && (
+                <button
+                  type="button"
+                  title="Remove line"
+                  onClick={() => removeLine(i)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: 'var(--red, #ef4444)',
+                    cursor: 'pointer',
+                    padding: '2px 8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  ✕ Remove
+                </button>
+              )}
+            </div>
+
+            {/* Line Sub-Row 1: Item Dropdown & Description */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 12,
+                marginBottom: 12,
+              }}
             >
-              + line
-            </Btn>
-          )}
-        </Row>
-      ))}
-      <p style={{ color: C.muted, fontSize: '0.75rem' }}>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  Existing Item (auto-fills rate & GST)
+                </label>
+                <Dropdown
+                  style={{
+                    height: 40,
+                    background: 'var(--panel)',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: '0.85rem',
+                  }}
+                  value={line.itemId || ''}
+                  onChange={(val) => handleItemSelect(i, val)}
+                  placeholder="— Select existing item —"
+                  options={itemOptions}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  Line description
+                </label>
+                <input
+                  className="fp-input-modern"
+                  style={{ height: 40, background: 'var(--panel)', width: '100%' }}
+                  value={line.description}
+                  onChange={(e) => setLine(i, { description: e.target.value })}
+                  placeholder="e.g. Consulting, Laptop, etc."
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Line Sub-Row 2: Qty, Rate, GST %, and Line Total Preview */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '80px minmax(110px, 1fr) 100px minmax(130px, 1fr)',
+                gap: 12,
+                alignItems: 'flex-end',
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  Qty
+                </label>
+                <input
+                  className="fp-input-modern"
+                  style={{
+                    height: 40,
+                    background: 'var(--panel)',
+                    textAlign: 'center',
+                    width: '100%',
+                  }}
+                  type="number"
+                  min="1"
+                  value={line.qty}
+                  onChange={(e) => setLine(i, { qty: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  Rate (₹)
+                </label>
+                <input
+                  className="fp-input-modern"
+                  style={{ height: 40, background: 'var(--panel)', width: '100%' }}
+                  value={line.rateRupees}
+                  onChange={(e) => setLine(i, { rateRupees: e.target.value })}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  GST %
+                </label>
+                <Dropdown
+                  style={{
+                    height: 40,
+                    background: 'var(--panel)',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: '0.85rem',
+                  }}
+                  value={line.gstRate}
+                  onChange={(val) => setLine(i, { gstRate: val })}
+                  options={['0', '5', '12', '18', '28', '40'].map((r) => ({
+                    value: r,
+                    label: `${r}%`,
+                  }))}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.76rem',
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    marginBottom: 5,
+                  }}
+                >
+                  Total (incl. GST)
+                </label>
+                <div
+                  style={{
+                    height: 40,
+                    background: 'var(--panel)',
+                    borderRadius: 8,
+                    padding: '0 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontWeight: 600,
+                    color: 'var(--accent, #FF4404)',
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  ₹{calculateLineTotal(line)}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Add line button */}
+        <button
+          type="button"
+          onClick={() =>
+            setLines((ls) => [
+              ...ls,
+              { itemId: '', description: '', qty: '1', rateRupees: '', gstRate: '18' },
+            ])
+          }
+          style={{
+            background: 'transparent',
+            border: '1px dashed var(--border)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            color: 'var(--accent, #FF4404)',
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>+</span> Add another line
+        </button>
+      </div>
+
+      <p style={{ color: C.muted, fontSize: '0.75rem', marginBottom: '14px' }}>
         Totals, tax split and payable are computed by the server (I5) — nothing you type here is
         trusted as a total.
       </p>
+
       <Row>
         <Btn disabled={busy}>Create draft</Btn>
       </Row>
@@ -281,8 +676,17 @@ function NewInvoice({ parties, onDone }: { parties: Party[]; onDone: () => void 
 export function InvoicesPage() {
   const invoices = useLoad(() => api<{ invoices: InvoiceRow[] }>('GET', '/api/v1/invoices'));
   const parties = useLoad(() => api<{ parties: Party[] }>('GET', '/api/v1/parties'));
+  const items = useLoad(() => api<{ items: Item[] }>('GET', '/api/v1/items'));
   const [error, setError] = useState<unknown>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
+  const [emailModal, setEmailModal] = useState<{
+    invoiceId: string;
+    invoiceNumber: string | null;
+    defaultEmail: string;
+  } | null>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -317,12 +721,14 @@ export function InvoicesPage() {
           ? selectedInvoice
           : invoices.data?.invoices.find((i) => i.id === id);
       const party = parties.data?.parties.find((p) => p.name === inv?.partySnapshot?.name);
-      const recipient = window.prompt(
-        `Send invoice ${inv?.invoiceNumber ?? ''} to email:`,
-        party?.email || '',
-      );
-      if (!recipient || !recipient.trim()) return;
-      body = { email: recipient.trim() };
+      setEmailInput(party?.email || '');
+      setEmailSuccess(false);
+      setEmailModal({
+        invoiceId: id,
+        invoiceNumber: inv?.invoiceNumber ?? null,
+        defaultEmail: party?.email || '',
+      });
+      return; // modal will handle the actual send
     }
     try {
       await api('POST', `/api/v1/invoices/${id}/${action}`, body);
@@ -340,10 +746,33 @@ export function InvoicesPage() {
     }
   }
 
+  async function handleEmailSend() {
+    if (!emailModal || !emailInput.trim()) return;
+    setEmailSending(true);
+    setError(null);
+    try {
+      await api('POST', `/api/v1/invoices/${emailModal.invoiceId}/send`, {
+        email: emailInput.trim(),
+      });
+      setEmailSuccess(true);
+      invoices.reload();
+      setTimeout(() => setEmailModal(null), 1800);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
   return (
     <div>
       <Card title="New invoice">
-        <NewInvoice parties={parties.data?.parties ?? []} onDone={invoices.reload} />
+        <NewInvoice
+          parties={parties.data?.parties ?? []}
+          items={items.data?.items ?? []}
+          existingInvoices={invoices.data?.invoices ?? []}
+          onDone={invoices.reload}
+        />
       </Card>
       <Card title="Invoices">
         <Err error={error} />
@@ -394,22 +823,46 @@ export function InvoicesPage() {
             <Money key="t" paise={inv.grandTotalPaise} />,
             <Money key="d" paise={inv.amountDuePaise} />,
             <span key="a" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <Btn small kind="ghost" onClick={() => void openInvoiceDetails(inv)}>
-                View
+              <Btn
+                small
+                iconOnly
+                kind="ghost"
+                title="View invoice"
+                onClick={() => void openInvoiceDetails(inv)}
+              >
+                <HugeiconsIcon icon={ViewIcon} size={16} />
               </Btn>
               {inv.status === 'draft' && (
-                <Btn small onClick={() => void act(inv.id, 'issue')}>
-                  Issue
+                <Btn
+                  small
+                  iconOnly
+                  kind="primary"
+                  title="Issue invoice"
+                  onClick={() => void act(inv.id, 'issue')}
+                >
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
                 </Btn>
               )}
               {inv.status === 'issued' && (
-                <Btn small kind="ghost" onClick={() => void act(inv.id, 'send')}>
-                  Email
+                <Btn
+                  small
+                  iconOnly
+                  kind="ghost"
+                  title="Email invoice"
+                  onClick={() => void act(inv.id, 'send')}
+                >
+                  <HugeiconsIcon icon={Mail01Icon} size={16} />
                 </Btn>
               )}
               {(inv.status === 'draft' || inv.status === 'issued') && (
-                <Btn small kind="danger" onClick={() => void act(inv.id, 'cancel')}>
-                  Cancel
+                <Btn
+                  small
+                  iconOnly
+                  kind="danger"
+                  title="Cancel invoice"
+                  onClick={() => void act(inv.id, 'cancel')}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={16} />
                 </Btn>
               )}
             </span>,
@@ -437,7 +890,7 @@ export function InvoicesPage() {
             style={{
               background: C.panel,
               color: C.text,
-              border: `1px solid ${C.border}`,
+              border: 'none',
               borderRadius: 16,
               width: '100%',
               maxWidth: 880,
@@ -455,7 +908,7 @@ export function InvoicesPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                borderBottom: `1px solid ${C.border}`,
+                borderBottom: 'none',
                 paddingBottom: '1.2rem',
                 marginBottom: '1.4rem',
                 flexWrap: 'wrap',
@@ -478,16 +931,15 @@ export function InvoicesPage() {
                     '—'}{' '}
                   {GST_STATE_CODES[
                     selectedInvoice.placeOfSupplyStateCode ||
-                      selectedInvoice.partySnapshot?.stateCode ||
-                      ''
+                    selectedInvoice.partySnapshot?.stateCode ||
+                    ''
                   ]
-                    ? `(${
-                        GST_STATE_CODES[
-                          selectedInvoice.placeOfSupplyStateCode ||
-                            selectedInvoice.partySnapshot?.stateCode ||
-                            ''
-                        ]
-                      })`
+                    ? `(${GST_STATE_CODES[
+                    selectedInvoice.placeOfSupplyStateCode ||
+                    selectedInvoice.partySnapshot?.stateCode ||
+                    ''
+                    ]
+                    })`
                     : ''}
                 </p>
               </div>
@@ -500,8 +952,8 @@ export function InvoicesPage() {
                   title="Close (Esc)"
                   onClick={() => setSelectedInvoice(null)}
                   style={{
-                    background: 'transparent',
-                    border: `1px solid ${C.border}`,
+                    background: C.panel2,
+                    border: 'none',
                     borderRadius: 8,
                     color: C.muted,
                     cursor: 'pointer',
@@ -614,7 +1066,7 @@ export function InvoicesPage() {
               <div
                 style={{
                   background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-                  border: `1px solid color-mix(in srgb, var(--accent) 30%, transparent)`,
+                  border: 'none',
                   borderRadius: 10,
                   padding: '0.8rem 1rem',
                   marginBottom: '1.4rem',
@@ -894,28 +1346,39 @@ export function InvoicesPage() {
                   </Btn>
                 )}
                 {selectedInvoice.status === 'issued' && (
-                  <Btn
-                    small
-                    kind="ghost"
-                    onClick={async () => {
-                      await act(selectedInvoice.id, 'send');
-                    }}
-                  >
-                    Email Invoice
-                  </Btn>
+                  <>
+                    <Btn
+                      small
+                      kind="ghost"
+                      onClick={async () => {
+                        await act(selectedInvoice.id, 'send');
+                      }}
+                    >
+                      Email Invoice (PDF)
+                    </Btn>
+                    <Btn
+                      small
+                      kind="ghost"
+                      onClick={() => {
+                        window.open(`/api/v1/invoices/${selectedInvoice.id}/pdf`, '_blank');
+                      }}
+                    >
+                      Download PDF
+                    </Btn>
+                  </>
                 )}
                 {(selectedInvoice.status === 'draft' ||
                   selectedInvoice.status === 'issued') && (
-                  <Btn
-                    small
-                    kind="danger"
-                    onClick={async () => {
-                      await act(selectedInvoice.id, 'cancel');
-                    }}
-                  >
-                    Cancel Invoice
-                  </Btn>
-                )}
+                    <Btn
+                      small
+                      kind="danger"
+                      onClick={async () => {
+                        await act(selectedInvoice.id, 'cancel');
+                      }}
+                    >
+                      Cancel Invoice
+                    </Btn>
+                  )}
               </div>
               <Btn kind="ghost" small onClick={() => setSelectedInvoice(null)}>
                 Close
@@ -924,6 +1387,219 @@ export function InvoicesPage() {
           </div>
         </div>
       )}
+      {/* Email Invoice Modal */}
+      {emailModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.70)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget && !emailSending) setEmailModal(null); }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 20,
+              padding: '2rem',
+              width: '100%',
+              maxWidth: 440,
+              boxShadow: '0 25px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+              animation: 'slideUp 0.25s ease-out',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.5rem' }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #FF4404, #ff6b35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 4px 15px rgba(255,68,4,0.4)',
+                }}
+              >
+                <HugeiconsIcon icon={Mail01Icon} size={22} color="#fff" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
+                  Email Invoice
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
+                  {emailModal.invoiceNumber ? `Invoice #${emailModal.invoiceNumber} • PDF Attached` : 'Draft invoice'}
+                </p>
+              </div>
+            </div>
+
+            {emailSuccess ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '1.5rem 0',
+                  animation: 'slideUp 0.2s ease-out',
+                }}
+              >
+                <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>✅</div>
+                <p style={{ margin: 0, color: '#4ade80', fontWeight: 600, fontSize: '1rem' }}>
+                  Invoice PDF sent successfully!
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
+                  PDF document attached and delivered to {emailInput}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(255, 68, 4, 0.12)',
+                    border: '1px solid rgba(255, 68, 4, 0.25)',
+                    marginBottom: 16,
+                    fontSize: '0.8rem',
+                    color: '#ff8a65',
+                  }}
+                >
+                  <span>📎</span>
+                  <span>An official <strong>PDF tax invoice</strong> will be attached to the email.</span>
+                </div>
+                <label
+                  htmlFor="email-invoice-input"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: 'rgba(255,255,255,0.7)',
+                    marginBottom: 8,
+                    letterSpacing: '0.03em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Recipient Email Address
+                </label>
+                <input
+                  id="email-invoice-input"
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="customer@example.com"
+                  disabled={emailSending}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleEmailSend();
+                    if (e.key === 'Escape') setEmailModal(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 10,
+                    border: '1.5px solid rgba(255,255,255,0.15)',
+                    background: 'rgba(255,255,255,0.07)',
+                    color: '#fff',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    marginBottom: '1.25rem',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#FF4404'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+                />
+
+                <Err error={error} />
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                  <button
+                    type="button"
+                    disabled={emailSending}
+                    onClick={() => setEmailModal(null)}
+                    style={{
+                      padding: '0.6rem 1.2rem',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'transparent',
+                      color: 'rgba(255,255,255,0.6)',
+                      fontSize: '0.875rem',
+                      cursor: emailSending ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={emailSending || !emailInput.trim()}
+                    onClick={() => void handleEmailSend()}
+                    style={{
+                      padding: '0.6rem 1.4rem',
+                      borderRadius: 8,
+                      border: 'none',
+                      background:
+                        emailSending || !emailInput.trim()
+                          ? 'rgba(255,68,4,0.4)'
+                          : 'linear-gradient(135deg, #FF4404, #ff6b35)',
+                      color: '#fff',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: emailSending || !emailInput.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      boxShadow: emailSending || !emailInput.trim() ? 'none' : '0 4px 15px rgba(255,68,4,0.35)',
+                    }}
+                  >
+                    {emailSending ? (
+                      <>
+                        <span
+                          style={{
+                            width: 14,
+                            height: 14,
+                            border: '2px solid rgba(255,255,255,0.3)',
+                            borderTopColor: '#fff',
+                            borderRadius: '50%',
+                            display: 'inline-block',
+                            animation: 'spin 0.6s linear infinite',
+                          }}
+                        />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        <HugeiconsIcon icon={Mail01Icon} size={14} />
+                        Send Invoice
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(16px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

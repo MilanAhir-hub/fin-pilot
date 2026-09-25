@@ -1,7 +1,7 @@
 /** Customers & vendors with outstandings, plus the item master (§32 Phase 6). */
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { Badge, Btn, C, Card, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
+import { Badge, Btn, C, Card, Dropdown, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
 
 interface Party {
   id: string;
@@ -21,6 +21,7 @@ interface Item {
   sac?: string;
   gstRate: number;
   sellingPricePaise?: number;
+  purchasePricePaise?: number;
   unit?: string;
 }
 
@@ -60,14 +61,15 @@ function PartyForm({ onDone }: { onDone: () => void }) {
           <input style={S.input} value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field label="Type">
-          <select
-            style={S.input}
+          <Dropdown
+            style={{ ...S.input, minWidth: 140 }}
             value={type}
-            onChange={(e) => setType(e.target.value as 'customer' | 'vendor')}
-          >
-            <option value="customer">customer</option>
-            <option value="vendor">vendor</option>
-          </select>
+            onChange={(v) => setType(v as 'customer' | 'vendor')}
+            options={[
+              { value: 'customer', label: 'customer' },
+              { value: 'vendor', label: 'vendor' },
+            ]}
+          />
         </Field>
         <Field label="State code">
           <input
@@ -96,6 +98,8 @@ function ItemForm({ onDone }: { onDone: () => void }) {
   const [kind, setKind] = useState<'service' | 'goods'>('service');
   const [code, setCode] = useState('');
   const [gstRate, setGstRate] = useState('18');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -104,14 +108,23 @@ function ItemForm({ onDone }: { onDone: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api('POST', '/api/v1/items', {
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         kind,
         gstRate: Number(gstRate),
         ...(kind === 'service' ? { sac: code.trim() } : { hsn: code.trim() }),
-      });
+      };
+      if (sellingPrice) {
+        payload.sellingPricePaise = Math.round(Number(sellingPrice) * 100);
+      }
+      if (purchasePrice) {
+        payload.purchasePricePaise = Math.round(Number(purchasePrice) * 100);
+      }
+      await api('POST', '/api/v1/items', payload);
       setName('');
       setCode('');
+      setSellingPrice('');
+      setPurchasePrice('');
       onDone();
     } catch (err) {
       setError(err);
@@ -133,14 +146,15 @@ function ItemForm({ onDone }: { onDone: () => void }) {
           />
         </Field>
         <Field label="Type">
-          <select
-            style={S.input}
+          <Dropdown
+            style={{ ...S.input, minWidth: 160 }}
             value={kind}
-            onChange={(e) => setKind(e.target.value as 'service' | 'goods')}
-          >
-            <option value="service">Service (SAC)</option>
-            <option value="goods">Goods (HSN)</option>
-          </select>
+            onChange={(v) => setKind(v as 'service' | 'goods')}
+            options={[
+              { value: 'service', label: 'Service (SAC)' },
+              { value: 'goods', label: 'Goods (HSN)' },
+            ]}
+          />
         </Field>
         <Field label={kind === 'service' ? 'SAC (6 digits)' : 'HSN (4, 6 or 8 digits)'}>
           <input
@@ -152,13 +166,34 @@ function ItemForm({ onDone }: { onDone: () => void }) {
           />
         </Field>
         <Field label="GST %">
-          <select style={S.input} value={gstRate} onChange={(e) => setGstRate(e.target.value)}>
-            {['0', '5', '18', '40'].map((r) => (
-              <option key={r} value={r}>
-                {r}%
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            style={{ ...S.input, width: 85 }}
+            value={gstRate}
+            onChange={setGstRate}
+            options={['0', '5', '18', '40'].map((r) => ({ value: r, label: `${r}%` }))}
+          />
+        </Field>
+        <Field label="Sales price (₹)">
+          <input
+            style={{ ...S.input, width: 120 }}
+            type="number"
+            min="0"
+            step="any"
+            value={sellingPrice}
+            onChange={(e) => setSellingPrice(e.target.value)}
+            placeholder="0.00"
+          />
+        </Field>
+        <Field label="Purchase price (₹)">
+          <input
+            style={{ ...S.input, width: 120 }}
+            type="number"
+            min="0"
+            step="any"
+            value={purchasePrice}
+            onChange={(e) => setPurchasePrice(e.target.value)}
+            placeholder="0.00"
+          />
         </Field>
         <Btn disabled={busy}>Add</Btn>
       </Row>
@@ -347,12 +382,14 @@ export function PartiesPage() {
         <ItemForm onDone={items.reload} />
         <Err error={items.error} />
         <Tbl
-          head={['Name', 'Kind', 'HSN/SAC', 'GST rate']}
+          head={['Name', 'Kind', 'HSN/SAC', 'GST rate', 'Sales price', 'Purchase price']}
           rows={(items.data?.items ?? []).map((i) => [
             i.name,
             <Badge key="k" value={i.kind} />,
             i.sac ?? i.hsn ?? '—',
             `${i.gstRate}%`,
+            <Money key="sp" paise={i.sellingPricePaise ?? 0} />,
+            <Money key="pp" paise={i.purchasePricePaise ?? 0} />,
           ])}
         />
       </Card>

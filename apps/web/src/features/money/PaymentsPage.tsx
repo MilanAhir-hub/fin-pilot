@@ -13,6 +13,7 @@ import {
   S,
   Tbl,
   dateStr,
+  Dropdown,
   rupeesToPaise,
   today,
   useLoad,
@@ -110,29 +111,28 @@ export function PaymentsPage() {
         <form onSubmit={submit}>
           <Row>
             <Field label="Direction">
-              <select
-                style={S.input}
+              <Dropdown
+                style={{ ...S.input, minWidth: 200 }}
                 value={direction}
-                onChange={(e) => setDirection(e.target.value as 'inflow' | 'outflow')}
-              >
-                <option value="inflow">inflow (customer pays)</option>
-                <option value="outflow">outflow (we pay)</option>
-              </select>
+                onChange={(v) => setDirection(v as 'inflow' | 'outflow')}
+                options={[
+                  { value: 'inflow', label: 'inflow (customer pays)' },
+                  { value: 'outflow', label: 'outflow (we pay)' },
+                ]}
+              />
             </Field>
             <Field label="Party">
-              <select
-                style={S.input}
+              <Dropdown
+                style={{ ...S.input, minWidth: 180 }}
                 value={partyId}
-                onChange={(e) => setPartyId(e.target.value)}
+                onChange={setPartyId}
+                placeholder="— pick —"
                 required
-              >
-                <option value="">— pick —</option>
-                {(parties.data?.parties ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                options={(parties.data?.parties ?? []).map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                }))}
+              />
             </Field>
             <Field label="Amount (₹)">
               <input
@@ -143,45 +143,41 @@ export function PaymentsPage() {
               />
             </Field>
             <Field label="Method">
-              <select style={S.input} value={method} onChange={(e) => setMethod(e.target.value)}>
-                {['bank_transfer', 'cash', 'upi', 'neft', 'rtgs', 'imps', 'cheque', 'card'].map(
-                  (m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ),
-                )}
-              </select>
+              <Dropdown
+                style={{ ...S.input, minWidth: 150 }}
+                value={method}
+                onChange={setMethod}
+                options={['bank_transfer', 'cash', 'upi', 'neft', 'rtgs', 'imps', 'cheque', 'card'].map((m) => ({
+                  value: m,
+                  label: m.replace(/_/g, ' '),
+                }))}
+              />
             </Field>
             <Field label="Deposit / pay account">
-              <select
-                style={S.input}
+              <Dropdown
+                style={{ ...S.input, minWidth: 200 }}
                 value={depositAccountId}
-                onChange={(e) => setDepositAccountId(e.target.value)}
+                onChange={setDepositAccountId}
+                placeholder="— pick —"
                 required
-              >
-                <option value="">— pick —</option>
-                {bankish.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} · {a.name}
-                  </option>
-                ))}
-              </select>
+                options={bankish.map((a) => ({
+                  value: a.id,
+                  label: `${a.code} · ${a.name}`,
+                }))}
+              />
             </Field>
             {direction === 'inflow' && (
               <Field label="Allocate to invoice (optional — rest becomes an advance)">
-                <select
-                  style={S.input}
+                <Dropdown
+                  style={{ ...S.input, minWidth: 220 }}
                   value={invoiceId}
-                  onChange={(e) => setInvoiceId(e.target.value)}
-                >
-                  <option value="">— none (advance) —</option>
-                  {openInvoices.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber ?? inv.id}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setInvoiceId}
+                  placeholder="— none (advance) —"
+                  options={openInvoices.map((inv) => ({
+                    value: inv.id,
+                    label: inv.invoiceNumber ?? inv.id,
+                  }))}
+                />
               </Field>
             )}
             <Btn disabled={busy}>Record</Btn>

@@ -5,6 +5,8 @@ import { tenantScope } from '../plugins/tenantScope';
 export interface ExtractedField<T> {
   value: T | null; // null = low confidence — NEVER guessed (§32 done-when)
   confidence: number; // 0–1
+  status?: 'valid' | 'not_found' | 'review';
+  optional?: boolean;
 }
 
 export interface DocumentDoc {
@@ -31,7 +33,12 @@ export interface DocumentDoc {
   updatedAt: Date;
 }
 
-const field = { value: Schema.Types.Mixed, confidence: Number };
+const field = {
+  value: Schema.Types.Mixed,
+  confidence: Number,
+  status: { type: String, enum: ['valid', 'not_found', 'review'] },
+  optional: Boolean,
+};
 
 const DocumentSchema = new Schema<DocumentDoc>(
   {

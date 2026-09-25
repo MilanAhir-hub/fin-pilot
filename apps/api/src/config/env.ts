@@ -71,10 +71,17 @@ const envSchema = z.object({
   // AI LLM API Keys
   GEMINI_API_KEY: z.string().optional(),
 
-  // Mail — Mailhog in dev; Resend/SES in production
-  SMTP_HOST: z.string().default('localhost'),
-  SMTP_PORT: z.coerce.number().int().positive().default(1025),
-  MAIL_FROM: z.string().default('FinPilot <no-reply@finpilot.local>'),
+  // Mail — Resend SMTP relay in dev/prod; SMTP_USER=resend + SMTP_PASS=<api_key>
+  SMTP_HOST: z.string().default('smtp.resend.com'),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((v) => v === 'true' || v === '1'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('FinPilot <onboarding@resend.dev>'),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });

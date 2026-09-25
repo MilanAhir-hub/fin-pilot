@@ -163,4 +163,16 @@ export const accountService = {
     }
     return { created, existing: have.size };
   },
+
+  /**
+   * Ensures the Indian SME chart of accounts template is seeded for the current tenant.
+   * If standard control accounts (like 1130 Accounts Receivable) are not yet seeded,
+   * seeds them idempotently.
+   */
+  async ensureTemplate(): Promise<void> {
+    const ar = await accountRepo.findByCode('1130');
+    if (!ar) {
+      await this.seedTemplate();
+    }
+  },
 };

@@ -305,4 +305,54 @@ describe('idempotency (I7, §18.6)', () => {
       .expect(422);
     expect(res.body.error.code).toBe('SYS_IDEMPOTENCY_KEY_REUSE');
   });
+
+  it('issues an invoice successfully even if COA was not explicitly pre-seeded (auto-seeds)', async () => {
+    await request(app)
+      .post('/api/v1/auth/register')
+      .send({ email: 'autocoa@spec.in', password: 'autocoa-spec-pass', name: 'Auto COA Owner' })
+      .expect(201);
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'autocoa@spec.in', password: 'autocoa-spec-pass' })
+      .expect(200);
+    const userToken = loginRes.body.data.accessToken;
+
+    const compRes = await request(app)
+      .post('/api/v1/companies')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ legalName: 'Auto COA Co', stateCode: '24', booksBeginDate: '2026-04-01' })
+      .expect(201);
+    const newCompanyId = compRes.body.data.company.id;
+    const newAuth = () => ({ Authorization: `Bearer ${userToken}`, 'X-Company-Id': newCompanyId });
+
+    const partyRes = await request(app)
+      .post('/api/v1/parties')
+      .set(newAuth())
+      .send({
+        type: ['customer'],
+        name: 'Auto Buyer',
+        gstRegistrationType: 'unregistered',
+        placeOfSupplyStateCode: '24',
+      })
+      .expect(201);
+
+    const draftRes = await request(app)
+      .post('/api/v1/invoices')
+      .set({ ...newAuth(), 'Idempotency-Key': randomUUID() })
+      .send({
+        partyId: partyRes.body.data.party.id,
+        issueDate: '2026-07-01',
+        lines: [TEN_K_LINE],
+      })
+      .expect(201);
+
+    const issueRes = await request(app)
+      .post(`/api/v1/invoices/${draftRes.body.data.invoice.id}/issue`)
+      .set({ ...newAuth(), 'Idempotency-Key': randomUUID() })
+      .expect(201);
+
+    expect(issueRes.body.data.invoice.status).toBe('issued');
+    expect(issueRes.body.data.invoice.invoiceNumber).toBeTruthy();
+    expect(issueRes.body.data.invoice.journalEntryId).toBeTruthy();
+  });
 });
