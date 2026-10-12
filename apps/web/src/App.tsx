@@ -29,8 +29,9 @@ import { CopilotPage } from './features/copilot/CopilotPage';
 import { NotificationsPage } from './features/platform/NotificationsPage';
 import { MembersPage } from './features/platform/MembersPage';
 import { BillingPage } from './features/platform/BillingPage';
-import { AdminPage } from './features/platform/AdminPage';
+import { AdminPortal } from './features/platform/AdminPortal';
 import { LandingPage } from './features/landing/LandingPage';
+import { hiddenNavFor } from '@finpilot/shared';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Invoice01Icon,
@@ -49,7 +50,6 @@ import {
   AiMagicIcon,
   Notification01Icon,
   CreditCardIcon,
-  Wrench01Icon,
   Logout01Icon,
   ArrowReloadHorizontalIcon as _ArrowReloadHorizontalIcon,
 } from '@hugeicons/core-free-icons';
@@ -63,6 +63,8 @@ interface CompanyRow {
   id: string;
   legalName: string;
   role: { key: string; name: string };
+  /** Sections a platform operator switched off. The API refuses them too. */
+  disabledModules?: string[];
 }
 
 function Logo({ size = '1.35rem', color = 'var(--text)' }: { size?: string; color?: string }) {
@@ -1205,7 +1207,15 @@ function Shell({
   onLogout: () => void;
 }) {
   const [route, go] = useHashRoute();
-  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Sections switched off for this company by a platform operator. The API
+  // refuses their routes regardless; hiding the nav just stops the user
+  // walking into a 403 they cannot do anything about.
+  const hidden = new Set(hiddenNavFor(company.disabledModules ?? []));
+  const nav = NAV.map((section) => ({
+    ...section,
+    items: section.items.filter((i) => !hidden.has(i.key)),
+  })).filter((section) => section.items.length > 0);
   const [unread, setUnread] = useState(0);
   const [imp, setImp] = useState(getImpersonation());
   const [collapsed, setCollapsed] = useState(() => {
@@ -1227,13 +1237,6 @@ function Shell({
   }
 
   useEffect(() => onImpersonationChange(setImp), []);
-  useEffect(() => {
-    api<{ organizations: unknown[] }>('GET', '/api/v1/admin/organizations', undefined, {
-      silent: [401, 403],
-    })
-      .then(() => setIsAdmin(true))
-      .catch(() => setIsAdmin(false));
-  }, []);
   const pollUnread = useCallback(() => {
     api<{ notifications: Array<{ readAt: string | null }> }>(
       'GET',
@@ -1267,7 +1270,6 @@ function Shell({
     notifications: <NotificationsPage />,
     team: <MembersPage />,
     billing: <BillingPage />,
-    admin: <AdminPage onImpersonated={() => go('dashboard')} />,
   };
 
   return (
@@ -1310,7 +1312,7 @@ function Shell({
               padding: collapsed ? '0.75rem 0.5rem' : '0.75rem 0.75rem',
             }}
           >
-            {NAV.map((section) => (
+            {nav.map((section) => (
               <div key={section.group}>
                 {section.group &&
                   (collapsed ? (
@@ -1344,34 +1346,6 @@ function Shell({
                 ))}
               </div>
             ))}
-            {isAdmin && (
-              <div>
-                {collapsed ? (
-                  <div style={{ height: 2, background: 'var(--panel-2)', margin: '0.6rem 0.5rem', borderRadius: 999 }} />
-                ) : (
-                  <div
-                    style={{
-                      color: '#64748b',
-                      fontSize: '0.68rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      fontWeight: 600,
-                      margin: '1.2rem 0 0.35rem',
-                      paddingLeft: 8,
-                    }}
-                  >
-                    Operator
-                  </div>
-                )}
-                <NavItem
-                  active={route === 'admin'}
-                  icon={<HugeiconsIcon icon={Wrench01Icon} size={20} />}
-                  label="Admin console"
-                  collapsed={collapsed}
-                  onClick={() => go('admin')}
-                />
-              </div>
-            )}
           </div>
 
           {/* Bottom Settings item */}
@@ -1654,7 +1628,22 @@ function Shell({
 
 // ── root ────────────────────────────────────────────────────────────────────
 
+/**
+ * The operator portal is a separate front door, not a page inside the customer
+ * app: operators hold no company membership, so there is no company for the
+ * tenant shell to put them in. #admin short-circuits the whole customer app.
+ */
+function isAdminRoute(): boolean {
+  return window.location.hash.replace(/^#\/?/, '').split(/[?/]/)[0] === 'admin';
+}
+
 export function App() {
+  const [adminRoute, setAdminRoute] = useState(isAdminRoute);
+  useEffect(() => {
+    const onHash = () => setAdminRoute(isAdminRoute());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [company, setCompany] = useState<CompanyRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1737,6 +1726,8 @@ export function App() {
     setAuthView('landing');
     window.location.hash = '';
   }
+
+  if (adminRoute) return <AdminPortal />;
 
   if (loading) {
     return (

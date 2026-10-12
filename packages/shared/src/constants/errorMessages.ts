@@ -30,7 +30,12 @@ export const ERROR_MESSAGES: Partial<Record<ErrorCode, string>> = {
   LEDGER_ALREADY_REVERSED: 'This entry has already been reversed.',
   LEDGER_NO_TRANSACTION: 'Ledger writes must run inside a transaction.',
   LEDGER_ACCOUNT_INACTIVE: 'One or more accounts do not exist or are inactive.',
+  AUTH_ACCOUNT_DISABLED: 'This account has been disabled by a platform administrator.',
+  SYS_MODULE_DISABLED:
+    'This section has been switched off for this company by a platform administrator.',
   GST_INVALID_GSTIN: 'The GSTIN is invalid (checksum failed).',
+  GST_COMPANY_GSTIN_MISSING:
+    'This company has no GSTIN yet. Add it on the GST screen before preparing returns.',
   GST_INVALID_RATE_FOR_DATE: 'This GST rate was not in force on the document date.',
   GST_HSN_DIGITS_INSUFFICIENT: 'HSN must be 6 digits once aggregate turnover exceeds ₹5 crore.',
   DOC_SELF_APPROVAL_FORBIDDEN: 'You cannot approve your own submission.',
