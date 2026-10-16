@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://fin-pilot-fh5b.onrender.com/api/:path*"
+    },
+    {
+      "source": "/healthz",
+      "destination": "https://fin-pilot-fh5b.onrender.com/healthz"
+    }
+  ]
+}
