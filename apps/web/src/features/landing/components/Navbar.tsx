@@ -1,10 +1,18 @@
 import { useState } from 'react';
-import { Menu, X, Sparkles, ArrowRight } from 'lucide-react';
+import { Menu, X, Sparkles, ArrowRight, Sun, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { navlinks } from '../data/navlinks';
 import type { INavLink } from '../types';
 
-export default function Navbar({ onGoToAuth }: { onGoToAuth?: () => void }) {
+export default function Navbar({
+  onGoToAuth,
+  theme = 'dark',
+  toggleTheme,
+}: {
+  onGoToAuth?: () => void;
+  theme?: string;
+  toggleTheme?: () => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLinkClick = (href: string) => {
@@ -18,6 +26,8 @@ export default function Navbar({ onGoToAuth }: { onGoToAuth?: () => void }) {
       }
     }
   };
+
+  const isLight = theme === 'light';
 
   return (
     <>
@@ -62,21 +72,60 @@ export default function Navbar({ onGoToAuth }: { onGoToAuth?: () => void }) {
           ))}
         </div>
 
-        <button
-          onClick={onGoToAuth}
-          className="px-nav-cta-desktop"
-        >
-          <span>Get Started / Sign In</span>
-          <ArrowRight size={15} />
-        </button>
+        <div className="px-nav-actions-desktop">
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="px-theme-toggle-btn"
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Bright Mode'}
+              aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Bright Mode'}
+              id="landing-bright-mode-toggle"
+            >
+              {isLight ? (
+                <>
+                  <Moon size={16} className="px-theme-icon" />
+                  <span className="px-theme-label">Dark</span>
+                </>
+              ) : (
+                <>
+                  <Sun size={16} className="px-theme-icon" />
+                  <span className="px-theme-label">Bright</span>
+                </>
+              )}
+            </button>
+          )}
 
-        <button
-          onClick={() => setIsOpen(true)}
-          className="px-nav-mobile-toggle"
-          aria-label="Open navigation menu"
-        >
-          <Menu size={26} />
-        </button>
+          <button
+            onClick={onGoToAuth}
+            className="px-nav-cta-desktop"
+          >
+            <span>Get Started / Sign In</span>
+            <ArrowRight size={15} />
+          </button>
+        </div>
+
+        <div className="px-nav-actions-mobile">
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="px-theme-toggle-btn px-theme-toggle-mobile"
+              title={isLight ? 'Switch to Dark Mode' : 'Switch to Bright Mode'}
+              aria-label={isLight ? 'Switch to Dark Mode' : 'Switch to Bright Mode'}
+            >
+              {isLight ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsOpen(true)}
+            className="px-nav-mobile-toggle"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={26} />
+          </button>
+        </div>
       </motion.nav>
 
       {/* Mobile Drawer */}
@@ -109,13 +158,35 @@ export default function Navbar({ onGoToAuth }: { onGoToAuth?: () => void }) {
           </a>
         ))}
 
+        {toggleTheme && (
+          <button
+            type="button"
+            onClick={() => {
+              toggleTheme();
+            }}
+            className="px-theme-toggle-btn px-mobile-theme-btn"
+          >
+            {isLight ? (
+              <>
+                <Moon size={18} />
+                <span>Switch to Dark Mode</span>
+              </>
+            ) : (
+              <>
+                <Sun size={18} />
+                <span>Switch to Bright Mode</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
           onClick={() => {
             setIsOpen(false);
             onGoToAuth?.();
           }}
           className="px-btn-primary"
-          style={{ marginTop: '1rem' }}
+          style={{ marginTop: '0.5rem' }}
         >
           <span>Get Started / Sign In</span>
           <ArrowRight size={16} />
