@@ -22,8 +22,8 @@ import { sniff } from './sniff';
 import { recognize } from './tesseract';
 import type { OcrOutcome } from './types';
 
-/** OCR costs ~1 s per page; a 200-page statement must not hold a request open. */
-const MAX_PAGES = Number(process.env.OCR_MAX_PAGES ?? 5);
+/** OCR costs ~1 s per page; limit default rasterization pages to prevent gateway timeouts. */
+const MAX_PAGES = Number(process.env.OCR_MAX_PAGES ?? 2);
 
 /**
  * Below this much real text, a "text layer" is a scanner's stray watermark

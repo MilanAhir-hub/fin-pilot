@@ -55,6 +55,8 @@ export interface Recognition {
   confidence: number;
 }
 
+const OCR_PAGE_TIMEOUT_MS = 10_000;
+
 export async function recognize(images: readonly Buffer[]): Promise<Recognition> {
   if (images.length === 0) return { text: '', confidence: 0 };
 
@@ -62,14 +64,26 @@ export async function recognize(images: readonly Buffer[]): Promise<Recognition>
   const confidences: number[] = [];
 
   for (const image of images) {
-    const { data } = await serialise(async () => {
-      const w = await getWorker();
-      return w.recognize(image);
-    });
-    texts.push(data.text);
-    confidences.push(data.confidence / 100);
+    try {
+      const recognitionPromise = serialise(async () => {
+        const w = await getWorker();
+        return w.recognize(image);
+      });
+      let timer: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Tesseract recognition timed out')), OCR_PAGE_TIMEOUT_MS);
+      });
+      const { data } = await Promise.race([recognitionPromise, timeoutPromise]).finally(() => {
+        if (timer) clearTimeout(timer);
+      });
+      texts.push(data.text);
+      confidences.push(data.confidence / 100);
+    } catch (err) {
+      logger.warn({ err }, 'tesseract page recognition skipped or timed out');
+    }
   }
 
+  if (confidences.length === 0) return { text: '', confidence: 0 };
   const mean = confidences.reduce((a, b) => a + b, 0) / confidences.length;
   return { text: texts.join('\n'), confidence: mean };
 }

@@ -128,7 +128,11 @@ export async function api<T>(
     const defaultMsg =
       res.status === 500
         ? 'Internal Server Error — backend server (port 4000) may be unreachable or down'
-        : res.statusText || 'Request failed';
+        : res.status === 502 || res.status === 504
+          ? `Server Gateway Error (${res.status}) — backend service temporarily unavailable or timed out`
+          : res.status === 413
+            ? 'File is too large to upload (maximum 4.5 MB)'
+            : res.statusText || `Request failed (${res.status})`;
     throw announce(
       new RequestError(
         res.status,
@@ -241,8 +245,72 @@ export async function sse(
   }
 }
 
-/** Read a File (photo / PDF) into the base64 upload contract (§18.5). */
-export function fileToBase64(file: File): Promise<string> {
+function resizeImageIfNeeded(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // If not running in a browser with Image/Canvas, fall back to standard reader
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+      reader.onerror = () => reject(new Error('file read failed'));
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && file.size < 1_000_000) {
+        // Already compact, read as-is
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(new Error('file read failed'));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const scale = Math.min(maxDim / width, maxDim / height, 1);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(new Error('file read failed'));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl.split(',')[1] ?? '');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('image load failed'));
+    };
+    img.src = url;
+  });
+}
+
+/** Read a File (photo / PDF) into the base64 upload contract (§18.5). Downscales large camera photos to ensure fast, reliable transfer. */
+export async function fileToBase64(file: File): Promise<string> {
+  if (file.type.startsWith('image/')) {
+    try {
+      return await resizeImageIfNeeded(file);
+    } catch {
+      // Fall through to raw reader if canvas downscaling fails
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
