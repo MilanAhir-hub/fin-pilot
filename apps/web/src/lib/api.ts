@@ -94,6 +94,37 @@ function headers(idem: boolean): Record<string, string> {
   };
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Perform a silent token refresh via the httpOnly session cookie.
+ * In-flight calls share a single promise to avoid token rotation races.
+ */
+export async function attemptSilentRefresh(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return null;
+      const json = (await res.json().catch(() => ({}))) as { data?: { accessToken: string } };
+      if (json.data?.accessToken) {
+        setAccessToken(json.data.accessToken);
+        return json.data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 export async function api<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
@@ -123,7 +154,32 @@ export async function api<T>(
     throw announce(unreachable(cause));
   }
   captureImpersonation(res);
-  const json = (await res.json().catch(() => ({}))) as { data?: T; error?: ApiError };
+  let json = (await res.json().catch(() => ({}))) as { data?: T; error?: ApiError };
+
+  // If unauthorized on a protected route, attempt a silent token refresh and retry once
+  if (res.status === 401 && !path.startsWith('/api/v1/auth/')) {
+    const newToken = await attemptSilentRefresh();
+    if (newToken) {
+      try {
+        const retryRes = await fetch(path, {
+          method,
+          credentials: 'include',
+          headers: headers(opts.idem ?? method !== 'GET'),
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        captureImpersonation(retryRes);
+        if (retryRes.ok) {
+          const retryJson = (await retryRes.json().catch(() => ({}))) as { data?: T; error?: ApiError };
+          return retryJson.data as T;
+        }
+        res = retryRes;
+        json = (await retryRes.json().catch(() => ({}))) as { data?: T; error?: ApiError };
+      } catch {
+        // Fall through to error reporting if retry fails
+      }
+    }
+  }
+
   if (!res.ok) {
     const defaultMsg =
       res.status === 500
@@ -152,6 +208,22 @@ export async function apiBlob(path: string): Promise<Blob> {
     throw reported(unreachable(cause));
   }
   captureImpersonation(res);
+
+  // If unauthorized, attempt silent refresh and retry download once
+  if (res.status === 401 && !path.startsWith('/api/v1/auth/')) {
+    const newToken = await attemptSilentRefresh();
+    if (newToken) {
+      try {
+        const retryRes = await fetch(path, { credentials: 'include', headers: headers(false) });
+        captureImpersonation(retryRes);
+        if (retryRes.ok) return retryRes.blob();
+        res = retryRes;
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
   if (!res.ok)
     throw reported(
       new RequestError(res.status, {

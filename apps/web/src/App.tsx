@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   api,
+  attemptSilentRefresh,
   getImpersonation,
   onImpersonationChange,
   setAccessToken,
@@ -26,8 +27,6 @@ import { DocumentsPage } from './features/documents/DocumentsPage';
 import { GstPage } from './features/compliance/GstPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { CopilotPage } from './features/copilot/CopilotPage';
-import { NotificationsPage } from './features/platform/NotificationsPage';
-import { MembersPage } from './features/platform/MembersPage';
 import { BillingPage } from './features/platform/BillingPage';
 import { AdminPortal } from './features/platform/AdminPortal';
 import { LandingPage } from './features/landing/LandingPage';
@@ -48,7 +47,6 @@ import {
   ShieldCheck,
   BarChartIcon,
   AiMagicIcon,
-  Notification01Icon,
   CreditCardIcon,
   Logout01Icon,
   ArrowReloadHorizontalIcon as _ArrowReloadHorizontalIcon,
@@ -1015,12 +1013,6 @@ const NAV: Array<{
   {
     group: 'Platform',
     items: [
-      {
-        key: 'notifications',
-        label: 'Notifications',
-        icon: <HugeiconsIcon icon={Notification01Icon} size={20} />,
-      },
-      { key: 'team', label: 'Team', icon: <HugeiconsIcon icon={UserGroupIcon} size={20} /> },
       { key: 'billing', label: 'Billing', icon: <HugeiconsIcon icon={CreditCardIcon} size={20} /> },
     ],
   },
@@ -1216,7 +1208,6 @@ function Shell({
     ...section,
     items: section.items.filter((i) => !hidden.has(i.key)),
   })).filter((section) => section.items.length > 0);
-  const [unread, setUnread] = useState(0);
   const [imp, setImp] = useState(getImpersonation());
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -1237,21 +1228,6 @@ function Shell({
   }
 
   useEffect(() => onImpersonationChange(setImp), []);
-  const pollUnread = useCallback(() => {
-    api<{ notifications: Array<{ readAt: string | null }> }>(
-      'GET',
-      '/api/v1/notifications',
-      undefined,
-      { silent: true },
-    )
-      .then((d) => setUnread(d.notifications.filter((n) => !n.readAt).length))
-      .catch(() => undefined);
-  }, []);
-  useEffect(() => {
-    pollUnread();
-    const t = setInterval(pollUnread, 30_000);
-    return () => clearInterval(t);
-  }, [pollUnread]);
 
   const PAGES: Record<string, React.ReactNode> = {
     dashboard: <DashboardPage />,
@@ -1267,8 +1243,6 @@ function Shell({
     gst: <GstPage />,
     reports: <ReportsPage />,
     copilot: <CopilotPage />,
-    notifications: <NotificationsPage />,
-    team: <MembersPage />,
     billing: <BillingPage />,
   };
 
@@ -1339,7 +1313,6 @@ function Shell({
                     active={route === item.key}
                     icon={item.icon}
                     label={item.label}
-                    badge={item.key === 'notifications' ? unread : undefined}
                     collapsed={collapsed}
                     onClick={() => go(item.key)}
                   />
@@ -1711,6 +1684,21 @@ export function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const renew = () => {
+      void attemptSilentRefresh();
+    };
+    // Keep session alive periodically in the background (every 10 minutes)
+    const interval = setInterval(renew, 10 * 60 * 1000);
+    // Refresh immediately when returning to tab after being away
+    window.addEventListener('focus', renew);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', renew);
+    };
+  }, [user]);
 
   function logout() {
     void api('POST', '/api/v1/auth/logout', {}, { silent: true }).catch(() => undefined);

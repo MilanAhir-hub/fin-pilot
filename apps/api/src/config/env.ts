@@ -32,7 +32,7 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z
     .string({ required_error: 'required — run `pnpm setup:env` or set it in .env.local' })
     .min(32, 'must be at least 32 characters (generate: openssl rand -hex 32)'),
-  JWT_ACCESS_TTL: z.string().default('15m'),
+  JWT_ACCESS_TTL: z.string().default('24h'),
   JWT_REFRESH_TTL: z.string().default('30d'),
 
   // REQUIRED — AES-256-GCM key for TOTP secrets at rest (§17.3). 64 hex chars.
