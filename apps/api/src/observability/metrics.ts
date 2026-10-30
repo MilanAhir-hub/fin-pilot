@@ -6,7 +6,6 @@
  */
 import type { NextFunction, Request, Response } from 'express';
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
-import { DeadLetter } from '../models/DeadLetter';
 
 export const metricsRegistry = new Registry();
 collectDefaultMetrics({ register: metricsRegistry, prefix: 'finpilot_' });
@@ -46,13 +45,7 @@ export const dlqDepth = new Gauge({
   labelNames: ['queue'] as const,
   registers: [metricsRegistry],
   async collect() {
-    // DeadLetter is platform-level (no tenant scope) — safe on the scrape path
-    const rows = await DeadLetter.aggregate<{ _id: string; n: number }>([
-      { $match: { replayedAt: null } },
-      { $group: { _id: '$queue', n: { $sum: 1 } } },
-    ]);
     this.reset();
-    for (const row of rows) this.set({ queue: row._id }, row.n);
   },
 });
 

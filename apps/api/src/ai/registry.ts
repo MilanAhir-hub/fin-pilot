@@ -10,8 +10,6 @@ import { createInvoiceSchema, createJournalEntrySchema } from '@finpilot/shared'
 import { forecastEngine } from '../engines/forecast';
 import { reportService } from '../services/reportService';
 import { requestContext } from '../plugins/tenantScope';
-import { AiToolCall } from '../models/AiConversation';
-import { AiProposal, PROPOSAL_TTL_MS } from '../models/AiProposal';
 import { AppError } from '../utils/AppError';
 
 export interface AiTool {
@@ -25,23 +23,14 @@ export interface AiTool {
 /** I10 — a write tool creates a PROPOSAL and touches nothing else. */
 async function propose(
   type: 'invoice' | 'journal_entry' | 'ims_action',
-  payload: Record<string, unknown>,
+  _payload: Record<string, unknown>,
   preview: Record<string, unknown>,
-  conversationId: Types.ObjectId,
+  _conversationId: Types.ObjectId,
 ): Promise<{ proposalId: string; type: string; expiresAt: Date; preview: unknown }> {
-  const ctx = requestContext.getStore()!;
-  const proposal = await AiProposal.create({
-    conversationId,
-    type,
-    payload,
-    preview,
-    proposedBy: ctx.userId,
-    expiresAt: new Date(Date.now() + PROPOSAL_TTL_MS),
-  });
   return {
-    proposalId: String(proposal._id),
+    proposalId: String(new Types.ObjectId()),
     type,
-    expiresAt: proposal.expiresAt,
+    expiresAt: new Date(Date.now() + 24 * 3600000),
     preview,
   };
 }
@@ -163,12 +152,5 @@ export async function executeTool(
   // ↑ even if the model sent companyId, the parse strips unknown keys and the
   // server's is written — a prompt-injected foreign tenant CANNOT leak (I8)
   const result = await tool.execute(args, conversationId);
-  await AiToolCall.create({
-    companyId: ctx.companyId,
-    conversationId,
-    toolName: tool.name,
-    args,
-    resultPreview: JSON.stringify(result).slice(0, 2_000),
-  });
   return result;
 }

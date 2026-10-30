@@ -113,7 +113,7 @@ let cached: Env | undefined;
 export function getEnv(): Env {
   if (cached) return cached;
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-  dotenv.config({ path: [resolve(root, '.env.local'), resolve(root, '.env')] });
+  dotenv.config({ path: [resolve(root, '.env.local'), resolve(root, '.env')], override: true });
   cached = parseEnv(process.env);
   return cached;
 }

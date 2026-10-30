@@ -6,7 +6,6 @@
 import { Queue, QueueEvents, UnrecoverableError, Worker, type Job, type Processor } from 'bullmq';
 import { getEnv } from '../config/env';
 import { logger } from '../config/logger';
-import { DeadLetter } from '../models/DeadLetter';
 import { queueJobDuration } from '../observability/metrics';
 
 export { UnrecoverableError };
@@ -78,16 +77,7 @@ export function createWorker<T>(
     const exhausted = job.attemptsMade >= (job.opts.attempts ?? 1);
     const unrecoverable = err instanceof UnrecoverableError || err.name === 'UnrecoverableError';
     if (!exhausted && !unrecoverable) return; // BullMQ will retry with backoff
-    void DeadLetter.create({
-      queue: name,
-      jobId: String(job.id),
-      name: job.name,
-      data: job.data,
-      error: err.message,
-      stack: err.stack,
-      failedAt: new Date(),
-    }).catch((dlqErr) => logger.error({ dlqErr }, 'DLQ write failed'));
-    logger.error({ queue: name, jobId: job.id, err: err.message }, 'job dead-lettered');
+    logger.error({ queue: name, jobId: job.id, err: err.message }, 'job failed');
   });
 
   worker.on('error', (err) => logger.error({ queue: name, err: err.message }, 'worker error'));

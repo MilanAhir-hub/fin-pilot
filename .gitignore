@@ -36,3 +36,7 @@ docker-compose.override.yml
 
 # tesseract language models (downloaded on first OCR run)
 *.traineddata
+
+# redis dump
+*.rdb
+

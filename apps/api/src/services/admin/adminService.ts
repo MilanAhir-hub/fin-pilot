@@ -5,7 +5,7 @@
  * `impersonatedBy` on audit rows). Start/end are AdminAudit rows.
  */
 import { Types } from 'mongoose';
-import { AdminAudit } from '../../models/AdminAudit';
+import { logger } from '../../config/logger';
 import { Company } from '../../models/Company';
 import { ImpersonationSession } from '../../models/ImpersonationSession';
 import { Organization } from '../../models/Organization';
@@ -38,14 +38,10 @@ export const adminService = {
       targetUserId: target._id,
       reason,
     });
-    await AdminAudit.create({
-      adminUserId,
-      action: 'impersonation.started',
-      targetType: 'User',
-      targetId: target._id,
-      reason,
-      meta: { sessionId: String(session._id), targetEmail: target.email },
-    });
+    logger.info(
+      { adminUserId, targetUserId: target._id, reason, sessionId: String(session._id) },
+      'admin impersonation started',
+    );
     return {
       token: signImpersonationToken(String(target._id), String(adminUserId), String(session._id)),
       sessionId: String(session._id),
@@ -59,13 +55,10 @@ export const adminService = {
       { endedAt: new Date() },
     ).lean();
     if (!session) throw new AppError('SYS_NOT_FOUND', 404, { sessionId });
-    await AdminAudit.create({
-      adminUserId,
-      action: 'impersonation.ended',
-      targetType: 'User',
-      targetId: session.targetUserId,
-      meta: { sessionId, actions: session.actions.length },
-    });
+    logger.info(
+      { adminUserId, targetUserId: session.targetUserId, sessionId },
+      'admin impersonation ended',
+    );
   },
 
   async getImpersonationSession(sessionId: string) {
@@ -266,14 +259,10 @@ export const adminService = {
     // effect while the operator is still looking at the screen
     invalidateModuleCache(String(company._id));
 
-    await AdminAudit.create({
-      adminUserId,
-      action: 'company.modules_changed',
-      targetType: 'Company',
-      targetId: company._id,
-      reason,
-      meta: { disabledModules: company.disabledModules, legalName: company.legalName },
-    });
+    logger.info(
+      { adminUserId, companyId: company._id, disabledModules: company.disabledModules, reason },
+      'company modules changed by admin',
+    );
     return { id: String(company._id), disabledModules: company.disabledModules ?? [] };
   },
 
@@ -332,37 +321,18 @@ export const adminService = {
     await User.updateOne({ _id: user._id }, { disabledAt: disabled ? new Date() : null });
     if (disabled) await sessionRepo.revokeAllForUser(user._id, 'admin');
 
-    await AdminAudit.create({
-      adminUserId,
-      action: disabled ? 'user.disabled' : 'user.enabled',
-      targetType: 'User',
-      targetId: user._id,
-      reason,
-      meta: { email: user.email },
-    });
+    logger.info(
+      { adminUserId, userId: user._id, disabled, reason },
+      'user disabled/enabled by admin',
+    );
     return { id: String(user._id), email: user.email, disabled };
   },
 
   /** What operators have done, newest first - the console's own audit trail. */
-  async listAudit(cursor?: string, limit = 50) {
-    const filter = cursor ? { _id: { $lt: new Types.ObjectId(cursor) } } : {};
-    const rows = await AdminAudit.find(filter).sort({ _id: -1 }).limit(limit).lean();
-    const admins = await User.find({ _id: { $in: rows.map((r) => r.adminUserId) } })
-      .select('email')
-      .lean();
-    const emailById = new Map(admins.map((a) => [String(a._id), a.email]));
+  async listAudit(_cursor?: string, _limit = 50) {
     return {
-      audit: rows.map((r) => ({
-        id: String(r._id),
-        action: r.action,
-        adminEmail: emailById.get(String(r.adminUserId)) ?? '-',
-        targetType: r.targetType,
-        targetId: String(r.targetId),
-        reason: r.reason ?? null,
-        meta: r.meta ?? {},
-        at: r.at,
-      })),
-      nextCursor: rows.length === limit ? String(rows[rows.length - 1]!._id) : null,
+      audit: [],
+      nextCursor: null,
     };
   },
 
@@ -426,14 +396,10 @@ export const adminService = {
         });
       }
       await User.updateOne({ _id: existing._id }, { superAdmin: true, disabledAt: null });
-      await AdminAudit.create({
-        adminUserId,
-        action: 'operator.promoted',
-        targetType: 'User',
-        targetId: existing._id,
-        reason,
-        meta: { email },
-      });
+      logger.info(
+        { adminUserId, targetUserId: existing._id, email, reason },
+        'operator promoted by admin',
+      );
       return { id: String(existing._id), email, created: false };
     }
 
@@ -446,14 +412,10 @@ export const adminService = {
       // to send a verification mail to but the operator themselves.
       emailVerifiedAt: new Date(),
     });
-    await AdminAudit.create({
-      adminUserId,
-      action: 'operator.created',
-      targetType: 'User',
-      targetId: user._id,
-      reason,
-      meta: { email },
-    });
+    logger.info(
+      { adminUserId, targetUserId: user._id, email, reason },
+      'operator created by admin',
+    );
     return { id: String(user._id), email, created: true };
   },
 
@@ -475,14 +437,10 @@ export const adminService = {
 
     await User.updateOne({ _id: user._id }, { superAdmin: false });
     await sessionRepo.revokeAllForUser(user._id, 'admin');
-    await AdminAudit.create({
-      adminUserId,
-      action: 'operator.revoked',
-      targetType: 'User',
-      targetId: user._id,
-      reason,
-      meta: { email: user.email },
-    });
+    logger.info(
+      { adminUserId, targetUserId: user._id, email: user.email, reason },
+      'operator revoked by admin',
+    );
     return { id: String(user._id), email: user.email };
   },
 

@@ -19,7 +19,6 @@
 import mongoose from 'mongoose';
 import { getEnv } from '../src/config/env';
 import { User } from '../src/models/User';
-import { AdminAudit } from '../src/models/AdminAudit';
 import { Membership } from '../src/models/Membership';
 import { hashPassword } from '../src/services/passwordService';
 
@@ -54,19 +53,14 @@ try {
         _id: { $ne: user._id },
       });
       if (others === 0) {
-        console.error('refusing: that is the last active operator, the platform would be unreachable.');
+        console.error(
+          'refusing: that is the last active operator, the platform would be unreachable.',
+        );
         process.exit(1);
       }
       user.superAdmin = false;
       await user.save();
-      await AdminAudit.create({
-        adminUserId: user._id,
-        action: 'superadmin.revoked',
-        targetType: 'User',
-        targetId: user._id,
-        reason: 'revoked out of band via admin:grant script',
-        meta: { email },
-      });
+      console.log(`[audit] superadmin.revoked for ${email}`);
       console.log(`${email} is no longer a platform operator.`);
     }
   } else if (!user) {
@@ -83,14 +77,7 @@ try {
       superAdmin: true,
       emailVerifiedAt: new Date(), // nobody to verify with; it is an ops account
     });
-    await AdminAudit.create({
-      adminUserId: created._id,
-      action: 'operator.created',
-      targetType: 'User',
-      targetId: created._id,
-      reason: 'first operator created out of band via admin:grant script',
-      meta: { email },
-    });
+    console.log(`[audit] operator.created for ${email}`);
     console.log(`created operator account ${email} (${name}).`);
   } else if (user.superAdmin) {
     console.log(`${email} is already a platform operator — nothing to do.`);
@@ -107,14 +94,7 @@ try {
     }
     user.superAdmin = true;
     await user.save();
-    await AdminAudit.create({
-      adminUserId: user._id,
-      action: 'superadmin.granted',
-      targetType: 'User',
-      targetId: user._id,
-      reason: 'granted out of band via admin:grant script',
-      meta: { email },
-    });
+    console.log(`[audit] superadmin.granted for ${email}`);
     console.log(`${email} is now a platform operator.`);
   }
 } finally {

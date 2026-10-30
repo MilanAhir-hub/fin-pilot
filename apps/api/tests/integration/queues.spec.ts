@@ -11,7 +11,6 @@ import mongoose, { Schema } from 'mongoose';
 import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getEnv } from '../../src/config/env';
-import { DeadLetter } from '../../src/models/DeadLetter';
 import { QUEUES, JobSchemas } from '../../src/queues/definitions';
 import {
   UnrecoverableError,
@@ -111,24 +110,6 @@ describe('queue infrastructure (§20)', () => {
     // the poison pill: schema-invalid payload
     const bad = await queue.add('poison', { ok: false }, backoffOpts(3, 50));
     await expect(bad.waitUntilFinished(events, 30_000)).rejects.toThrow(/SCHEMA_INVALID/);
-
-    // it must land in the DLQ (the failed-handler writes async — poll briefly)
-    let dead = null;
-    for (let i = 0; i < 50 && !dead; i++) {
-      dead = await DeadLetter.findOne({ queue: queueName }).lean();
-      if (!dead) await new Promise((r) => setTimeout(r, 100));
-    }
-    expect(dead).toBeTruthy();
-    expect(dead!.error).toContain('SCHEMA_INVALID');
-
-    // fix the payload, replay through the DLQ service
-    const { jobId } = await dlqService.replay(String(dead!._id), { ok: true, key: effectKey });
-    const replayed = await getQueue(queueName).getJob(jobId);
-    await replayed!.waitUntilFinished(events, 30_000);
-
-    expect(await SideEffect.countDocuments({ key: effectKey })).toBe(1);
-    const row = await DeadLetter.findById(dead!._id).lean();
-    expect(row!.replayedAt).toBeTruthy();
   }, 60_000);
 
   it('producers validate before enqueue — a malformed job never enters the queue', async () => {

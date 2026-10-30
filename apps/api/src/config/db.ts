@@ -6,12 +6,21 @@
  * fail at runtime. We verify setName at connect time and refuse to serve
  * without it.
  */
+import dns from 'node:dns';
 import mongoose from 'mongoose';
 import type { Env } from './env';
 import { logger } from './logger';
 
 export async function connectMongo(env: Env): Promise<typeof mongoose> {
   mongoose.set('strictQuery', true);
+
+  if (env.MONGO_URI.startsWith('mongodb+srv://')) {
+    try {
+      dns.setServers(['8.8.8.8', '1.1.1.1']);
+    } catch {
+      // ignore
+    }
+  }
 
   const conn = await mongoose.connect(env.MONGO_URI, {
     maxPoolSize: env.MONGO_MAX_POOL,

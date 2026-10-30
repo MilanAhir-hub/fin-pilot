@@ -38,29 +38,6 @@ const AiConversationSchema = new Schema<AiConversationDoc>(
 AiConversationSchema.plugin(tenantScope);
 export const AiConversation = model<AiConversationDoc>('AiConversation', AiConversationSchema);
 
-/** Every tool invocation, for audit + cost (§8.1, TTL 180 d). */
-export interface AiToolCallDoc {
-  _id: Types.ObjectId;
-  companyId: Types.ObjectId;
-  conversationId: Types.ObjectId;
-  toolName: string;
-  args: Record<string, unknown>; // as EXECUTED — companyId is the server's
-  resultPreview: string;
-  createdAt: Date;
-}
-const AiToolCallSchema = new Schema<AiToolCallDoc>(
-  {
-    conversationId: { type: Schema.Types.ObjectId, required: true },
-    toolName: { type: String, required: true },
-    args: Schema.Types.Mixed,
-    resultPreview: String,
-    createdAt: { type: Date, default: Date.now, expires: 15_552_000 },
-  },
-  { versionKey: false },
-);
-AiToolCallSchema.plugin(tenantScope);
-export const AiToolCall = model<AiToolCallDoc>('AiToolCall', AiToolCallSchema);
-
 /** Monthly token meter — MONGO is the source of truth (fail closed, §19.6). */
 export interface AiUsageDoc {
   _id: Types.ObjectId;

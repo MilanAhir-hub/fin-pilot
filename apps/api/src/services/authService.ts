@@ -115,7 +115,7 @@ export const authService = {
 
     const token = await createVerificationToken(user._id, 'email_verify');
     const templates = mailTemplates(getEnv().APP_URL);
-    await sendMail({ to: user.email, ...templates.verifyEmail(token) });
+    await sendMail({ to: user.email, ...templates.verifyEmail(token) }, { silent: true });
 
     return toPublicUser(user);
   },

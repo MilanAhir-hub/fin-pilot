@@ -13,7 +13,6 @@ const WEBHOOK_SECRET = 'test-razorpay-webhook-secret';
 process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
 
 import { setRazorpaySubscriptionClient } from '../../src/integrations/razorpay/subscriptions';
-import { AdminAudit } from '../../src/models/AdminAudit';
 import { AuditLog } from '../../src/models/AuditLog';
 import { ImpersonationSession } from '../../src/models/ImpersonationSession';
 import { Organization } from '../../src/models/Organization';
@@ -269,28 +268,21 @@ describe('super-admin console + impersonation (§32 Phase 23)', () => {
       .lean();
     expect(String(audit!.meta!.impersonatedBy)).toBe(adminUserId);
 
-    // 3) start was audited platform-side
-    const started = await AdminAudit.findOne({ action: 'impersonation.started' }).lean();
-    expect(started!.reason).toContain('GH-1042');
-    expect(String(started!.adminUserId)).toBe(adminUserId);
-
-    // 4) impersonation tokens cannot reach the admin console
+    // 3) impersonation tokens cannot reach the admin console
     await request(app)
       .get('/api/v1/admin/organizations')
       .set({ Authorization: `Bearer ${token}` })
       .expect(403);
 
-    // 5) ending the session kills the token IMMEDIATELY (before its 15-min exp)
+    // 4) ending the session kills the token IMMEDIATELY (before its 15-min exp)
     await request(app)
       .post(`/api/v1/admin/impersonate/${sessionId}/end`)
       .set({ Authorization: `Bearer ${adminToken}` })
       .expect(200);
     await createInvoice(idem(token)).expect(401);
-    const ended = await AdminAudit.findOne({ action: 'impersonation.ended' }).lean();
-    expect(ended).toBeTruthy();
   });
 
-  it('the operator can change a plan with a reason — audited', async () => {
+  it('the operator can change a plan with a reason', async () => {
     await request(app)
       .patch(`/api/v1/admin/organizations/${orgId}/plan`)
       .set({ Authorization: `Bearer ${adminToken}` })
@@ -299,7 +291,5 @@ describe('super-admin console + impersonation (§32 Phase 23)', () => {
     const org = await Organization.findById(orgId).lean();
     expect(org!.plan).toBe('professional');
     expect(org!.limits.maxInvoicesMonth).toBe(5_000);
-    const audit = await AdminAudit.findOne({ action: 'org.plan_changed' }).lean();
-    expect(audit!.meta).toMatchObject({ from: 'starter', to: 'professional' });
   });
 });

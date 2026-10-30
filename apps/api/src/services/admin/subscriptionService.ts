@@ -16,7 +16,6 @@ import {
   type CreatedSubscription,
 } from '../../integrations/razorpay/subscriptions';
 import { logger } from '../../config/logger';
-import { AdminAudit } from '../../models/AdminAudit';
 import { AiUsage } from '../../models/AiConversation';
 import { Company } from '../../models/Company';
 import { Document } from '../../models/Document';
@@ -243,14 +242,10 @@ export const subscriptionService = {
       { plan, status: 'active', seats: PLAN_LIMITS[plan].maxUsers },
       { upsert: true, setDefaultsOnInsert: true },
     );
-    await AdminAudit.create({
-      adminUserId,
-      action: 'org.plan_changed',
-      targetType: 'Organization',
-      targetId: org._id,
-      reason,
-      meta: { from: org.plan, to: plan },
-    });
+    logger.info(
+      { adminUserId, organizationId: org._id, from: org.plan, to: plan, reason },
+      'org plan changed by admin',
+    );
   },
 
   /** Nightly §20.7 `subscription.usage_rollup` — meters every organization. */

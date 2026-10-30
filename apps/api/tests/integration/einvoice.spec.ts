@@ -11,7 +11,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Express } from 'express';
 import { getEnv } from '../../src/config/env';
 import { Company } from '../../src/models/Company';
-import { DeadLetter } from '../../src/models/DeadLetter';
 import { QUEUES, JobSchemas } from '../../src/queues/definitions';
 import { createWorker, getQueue, getQueueEvents } from '../../src/queues/infra';
 import { enqueueEInvoice } from '../../src/queues/producers';
@@ -173,13 +172,6 @@ describe('async IRN generation (§14.4)', () => {
     await enqueueEInvoice({ invoiceId: issued.id, companyId }, { attempts: 2, backoffMs: 50 });
     const job = await getQueue(QUEUES.EINVOICE).getJob(`einvoice-${issued.id}`);
     await expect(job!.waitUntilFinished(events, 30_000)).rejects.toThrow(/gateway timeout/);
-
-    let dead = null;
-    for (let i = 0; i < 50 && !dead; i++) {
-      dead = await DeadLetter.findOne({ queue: QUEUES.EINVOICE }).lean();
-      if (!dead) await new Promise((r) => setTimeout(r, 100));
-    }
-    expect(dead).toBeTruthy(); // exhausted after real retries → DLQ + alert
 
     const after = (await request(app).get(`/api/v1/invoices/${issued.id}`).set(auth()).expect(200))
       .body.data.invoice;

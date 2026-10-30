@@ -39,7 +39,7 @@ const OrganizationSchema = new Schema<OrganizationDoc>(
       default: 'free',
     },
     limits: {
-      maxCompanies: { type: Number, default: 1 },
+      maxCompanies: { type: Number, default: 10 },
       maxUsers: { type: Number, default: 3 },
       maxInvoicesMonth: { type: Number, default: 50 },
       aiTokensMonth: { type: Number, default: 200_000 },

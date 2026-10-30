@@ -128,6 +128,16 @@ function NewInvoice({
 
   const customers = parties.filter((p) => p.type.includes('customer'));
 
+  const customerOptions = useMemo(() => {
+    if (customers.length > 0) {
+      return customers.map((p) => ({ value: p.id, label: p.name }));
+    }
+    return parties.map((p) => ({
+      value: p.id,
+      label: `${p.name} (${p.type.join(', ') || 'party'})`,
+    }));
+  }, [parties, customers]);
+
   const itemOptions = useMemo(() => {
     const opts: Array<{ value: string; label: string }> = [
       { value: '', label: '— Select existing item —' },
@@ -139,10 +149,7 @@ function NewInvoice({
           : it.purchasePricePaise && it.purchasePricePaise > 0
             ? it.purchasePricePaise
             : null;
-      const priceStr =
-        price !== null
-          ? ` · ₹${(price / 100).toFixed(2).replace(/\.00$/, '')}`
-          : '';
+      const priceStr = price !== null ? ` · ₹${(price / 100).toFixed(2).replace(/\.00$/, '')}` : '';
       opts.push({
         value: it.id,
         label: `${it.name}${priceStr} (${it.gstRate}%)`,
@@ -238,6 +245,17 @@ function NewInvoice({
     e.preventDefault();
     setError(null);
 
+    if (!partyId) {
+      setError(
+        new Error(
+          parties.length === 0
+            ? 'No party found. Please create a customer under "Parties & items" first.'
+            : 'Please select a customer for this invoice.',
+        ),
+      );
+      return;
+    }
+
     // Automatically remove/filter out completely empty lines
     const filledLines = lines.filter(
       (l) => l.description.trim() !== '' || l.rateRupees.trim() !== '',
@@ -324,8 +342,13 @@ function NewInvoice({
             onChange={handleCustomerChange}
             placeholder="— Select customer —"
             required
-            options={customers.map((p) => ({ value: p.id, label: p.name }))}
+            options={customerOptions}
           />
+          {parties.length === 0 && (
+            <p style={{ color: 'var(--accent, #FF4404)', fontSize: '0.78rem', marginTop: 4 }}>
+              No parties found. Please add a customer under <strong>Parties & items</strong>.
+            </p>
+          )}
         </div>
 
         <div>
@@ -931,15 +954,16 @@ export function InvoicesPage() {
                     '—'}{' '}
                   {GST_STATE_CODES[
                     selectedInvoice.placeOfSupplyStateCode ||
-                    selectedInvoice.partySnapshot?.stateCode ||
-                    ''
+                      selectedInvoice.partySnapshot?.stateCode ||
+                      ''
                   ]
-                    ? `(${GST_STATE_CODES[
-                    selectedInvoice.placeOfSupplyStateCode ||
-                    selectedInvoice.partySnapshot?.stateCode ||
-                    ''
-                    ]
-                    })`
+                    ? `(${
+                        GST_STATE_CODES[
+                          selectedInvoice.placeOfSupplyStateCode ||
+                            selectedInvoice.partySnapshot?.stateCode ||
+                            ''
+                        ]
+                      })`
                     : ''}
                 </p>
               </div>
@@ -1094,9 +1118,7 @@ export function InvoicesPage() {
                 Line Items
               </h4>
               <div style={{ overflowX: 'auto' }}>
-                <table
-                  style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}
-                >
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr
                       style={{
@@ -1134,9 +1156,7 @@ export function InvoicesPage() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px 10px', textAlign: 'right' }}>
-                              {line.qty}
-                            </td>
+                            <td style={{ padding: '10px 10px', textAlign: 'right' }}>{line.qty}</td>
                             <td style={{ padding: '10px 10px', textAlign: 'right' }}>
                               <Money paise={line.ratePaise} />
                             </td>
@@ -1367,18 +1387,17 @@ export function InvoicesPage() {
                     </Btn>
                   </>
                 )}
-                {(selectedInvoice.status === 'draft' ||
-                  selectedInvoice.status === 'issued') && (
-                    <Btn
-                      small
-                      kind="danger"
-                      onClick={async () => {
-                        await act(selectedInvoice.id, 'cancel');
-                      }}
-                    >
-                      Cancel Invoice
-                    </Btn>
-                  )}
+                {(selectedInvoice.status === 'draft' || selectedInvoice.status === 'issued') && (
+                  <Btn
+                    small
+                    kind="danger"
+                    onClick={async () => {
+                      await act(selectedInvoice.id, 'cancel');
+                    }}
+                  >
+                    Cancel Invoice
+                  </Btn>
+                )}
               </div>
               <Btn kind="ghost" small onClick={() => setSelectedInvoice(null)}>
                 Close
@@ -1401,7 +1420,9 @@ export function InvoicesPage() {
             justifyContent: 'center',
             padding: '1rem',
           }}
-          onClick={(e) => { if (e.target === e.currentTarget && !emailSending) setEmailModal(null); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !emailSending) setEmailModal(null);
+          }}
         >
           <div
             style={{
@@ -1437,7 +1458,9 @@ export function InvoicesPage() {
                   Email Invoice
                 </h3>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
-                  {emailModal.invoiceNumber ? `Invoice #${emailModal.invoiceNumber} • PDF Attached` : 'Draft invoice'}
+                  {emailModal.invoiceNumber
+                    ? `Invoice #${emailModal.invoiceNumber} • PDF Attached`
+                    : 'Draft invoice'}
                 </p>
               </div>
             </div>
@@ -1454,7 +1477,9 @@ export function InvoicesPage() {
                 <p style={{ margin: 0, color: '#4ade80', fontWeight: 600, fontSize: '1rem' }}>
                   Invoice PDF sent successfully!
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
+                <p
+                  style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}
+                >
                   PDF document attached and delivered to {emailInput}
                 </p>
               </div>
@@ -1475,7 +1500,9 @@ export function InvoicesPage() {
                   }}
                 >
                   <span>📎</span>
-                  <span>An official <strong>PDF tax invoice</strong> will be attached to the email.</span>
+                  <span>
+                    An official <strong>PDF tax invoice</strong> will be attached to the email.
+                  </span>
                 </div>
                 <label
                   htmlFor="email-invoice-input"
@@ -1516,8 +1543,12 @@ export function InvoicesPage() {
                     transition: 'border-color 0.2s',
                     marginBottom: '1.25rem',
                   }}
-                  onFocus={(e) => { e.target.style.borderColor = '#FF4404'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#FF4404';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255,255,255,0.15)';
+                  }}
                 />
 
                 <Err error={error} />
@@ -1560,7 +1591,10 @@ export function InvoicesPage() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
-                      boxShadow: emailSending || !emailInput.trim() ? 'none' : '0 4px 15px rgba(255,68,4,0.35)',
+                      boxShadow:
+                        emailSending || !emailInput.trim()
+                          ? 'none'
+                          : '0 4px 15px rgba(255,68,4,0.35)',
                     }}
                   >
                     {emailSending ? (

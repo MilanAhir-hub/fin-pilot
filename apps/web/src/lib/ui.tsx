@@ -131,7 +131,13 @@ export function Btn({
 }) {
   const styles: CSSProperties =
     kind === 'primary'
-      ? { background: C.accent, color: C.accentText, borderRadius: 8, fontWeight: 500, border: 'none' }
+      ? {
+          background: C.accent,
+          color: C.accentText,
+          borderRadius: 8,
+          fontWeight: 500,
+          border: 'none',
+        }
       : kind === 'danger'
         ? { background: C.red, color: '#fff', borderRadius: 8, fontWeight: 500, border: 'none' }
         : kind === 'success'
@@ -252,7 +258,12 @@ export function Tbl({
     <div style={{ overflowX: 'auto' }}>
       <table
         className="fp-table"
-        style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 2px', fontSize: '0.87rem' }}
+        style={{
+          width: '100%',
+          borderCollapse: 'separate',
+          borderSpacing: '0 2px',
+          fontSize: '0.87rem',
+        }}
       >
         <thead>
           <tr>
@@ -271,11 +282,7 @@ export function Tbl({
                   letterSpacing: '0.06em',
                   whiteSpace: 'nowrap',
                   borderRadius:
-                    i === 0
-                      ? '8px 0 0 8px'
-                      : i === head.length - 1
-                        ? '0 8px 8px 0'
-                        : undefined,
+                    i === 0 ? '8px 0 0 8px' : i === head.length - 1 ? '0 8px 8px 0' : undefined,
                 }}
               >
                 {h}
@@ -285,7 +292,15 @@ export function Tbl({
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} style={{ background: i % 2 === 1 ? 'color-mix(in srgb, var(--panel-2) 40%, transparent)' : 'transparent' }}>
+            <tr
+              key={i}
+              style={{
+                background:
+                  i % 2 === 1
+                    ? 'color-mix(in srgb, var(--panel-2) 40%, transparent)'
+                    : 'transparent',
+              }}
+            >
               {r.map((cell, j) => (
                 <td
                   key={j}
@@ -293,11 +308,7 @@ export function Tbl({
                     padding: '0.65rem 0.85rem',
                     border: 'none',
                     borderRadius:
-                      j === 0
-                        ? '6px 0 0 6px'
-                        : j === r.length - 1
-                          ? '0 6px 6px 0'
-                          : undefined,
+                      j === 0 ? '6px 0 0 6px' : j === r.length - 1 ? '0 6px 6px 0' : undefined,
                   }}
                 >
                   {cell}
@@ -381,12 +392,24 @@ export function Err({ error }: { error: unknown }) {
   }, [error, toast]);
 
   if (!error) return null;
-  const msg =
+  let msg =
     error instanceof RequestError
       ? error.error.message
       : error instanceof Error
         ? error.message
         : String(error);
+
+  if (error instanceof RequestError && error.error.details) {
+    const details = error.error.details as { fieldErrors?: Record<string, string[]> };
+    if (details.fieldErrors && typeof details.fieldErrors === 'object') {
+      const errList = Object.entries(details.fieldErrors).flatMap(([field, msgs]) =>
+        Array.isArray(msgs) ? msgs.map((m) => `${field}: ${m}`) : [],
+      );
+      if (errList.length > 0) {
+        msg = `${msg} (${errList.join(', ')})`;
+      }
+    }
+  }
   return (
     <p
       className="fp-msg"
