@@ -16,6 +16,7 @@
  *   pnpm --filter @finpilot/api admin:grant ops@example.com            # promote an existing account
  *   pnpm --filter @finpilot/api admin:grant ops@example.com --revoke
  */
+import dns from 'node:dns';
 import mongoose from 'mongoose';
 import { getEnv } from '../src/config/env';
 import { User } from '../src/models/User';
@@ -38,6 +39,13 @@ if (!email || email.startsWith('--')) {
 }
 
 const env = getEnv();
+if (env.MONGO_URI.startsWith('mongodb+srv://')) {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch {
+    // ignore
+  }
+}
 await mongoose.connect(env.MONGO_URI, { serverSelectionTimeoutMS: 15_000 });
 
 try {

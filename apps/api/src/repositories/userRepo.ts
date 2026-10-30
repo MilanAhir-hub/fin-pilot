@@ -12,22 +12,22 @@ export const userRepo = {
   },
 
   findByEmail(email: string): Promise<UserDoc | null> {
-    return User.findOne({ email }).lean();
+    return User.findOne({ email }).select('+superAdmin').lean();
   },
 
   /** Includes passwordHash — login path only. */
   findByEmailWithSecrets(email: string): Promise<UserDoc | null> {
     return User.findOne({ email })
-      .select('+passwordHash +totpSecretEnc +recoveryCodeHashes')
+      .select('+passwordHash +totpSecretEnc +recoveryCodeHashes +superAdmin')
       .lean();
   },
 
   findById(id: Types.ObjectId | string): Promise<UserDoc | null> {
-    return User.findById(id).lean();
+    return User.findById(id).select('+superAdmin').lean();
   },
 
   findByIdWithSecrets(id: Types.ObjectId | string): Promise<UserDoc | null> {
-    return User.findById(id).select('+passwordHash +totpSecretEnc +recoveryCodeHashes').lean();
+    return User.findById(id).select('+passwordHash +totpSecretEnc +recoveryCodeHashes +superAdmin').lean();
   },
 
   /**

@@ -57,6 +57,7 @@ export interface PublicUser {
   name: string;
   emailVerified: boolean;
   totpEnabled: boolean;
+  superAdmin?: boolean;
 }
 
 function toPublicUser(user: UserDoc): PublicUser {
@@ -66,6 +67,7 @@ function toPublicUser(user: UserDoc): PublicUser {
     name: user.name,
     emailVerified: Boolean(user.emailVerifiedAt),
     totpEnabled: Boolean(user.totpEnabledAt),
+    superAdmin: Boolean(user.superAdmin),
   };
 }
 

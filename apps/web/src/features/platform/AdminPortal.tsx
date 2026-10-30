@@ -365,6 +365,15 @@ export function AdminPortal() {
           >
             Operators
           </Btn>
+          <Btn
+            small
+            kind="ghost"
+            onClick={() => {
+              window.location.hash = '#dashboard';
+            }}
+          >
+            Customer App →
+          </Btn>
           <span style={{ color: C.muted, fontSize: '0.8rem' }}>{me.email}</span>
           <Btn small kind="ghost" onClick={() => void signOut()}>
             Sign out

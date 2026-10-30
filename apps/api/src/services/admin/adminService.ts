@@ -13,6 +13,7 @@ import { User } from '../../models/User';
 import { Invoice } from '../../models/Invoice';
 import { Bill } from '../../models/Bill';
 import { Membership } from '../../models/Membership';
+import { Payment } from '../../models/Payment';
 import { sessionRepo } from '../../repositories/sessionRepo';
 import { hashPassword } from '../passwordService';
 import { invalidateModuleCache } from '../../middleware/requireModule';
@@ -145,17 +146,40 @@ export const adminService = {
     const companiesWithDisabled = await Company.countDocuments({
       disabledModules: { $exists: true, $ne: [] },
     });
+    const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
+    // Sum amountPaise across all payments with method 'razorpay' (platform revenue proxy)
+    const revResult = await Payment.aggregate([
+      { $match: { method: 'razorpay' } },
+      { $group: { _id: null, total: { $sum: '$amountPaise' } } },
+    ]).option({ skipTenantScope: true });
+    const totalRevenuePaise: number = (revResult[0]?.total as number | undefined) ?? 0;
+    // Recent user registrations (last 7 days)
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentUsers = await User.find({ createdAt: { $gte: since7d } })
+      .select('email name createdAt')
+      .sort({ _id: -1 })
+      .limit(10)
+      .lean();
     return {
       organizations: orgs,
       companies,
       users,
+      activeUsers: users - disabledUsers,
       disabledUsers,
       invoices,
       bills,
+      activeSubscriptions,
+      totalRevenuePaise,
       companiesWithDisabledSections: companiesWithDisabled,
       plans: byPlan.map((row: { _id: string; count: number }) => ({
         plan: row._id,
         count: row.count,
+      })),
+      recentUsers: recentUsers.map((u) => ({
+        id: String(u._id),
+        email: u.email,
+        name: u.name,
+        createdAt: u.createdAt,
       })),
     };
   },
@@ -321,6 +345,136 @@ export const adminService = {
       audit: [],
       nextCursor: null,
     };
+  },
+
+  /**
+   * All subscriptions across orgs, for the admin console's subscriptions tab.
+   * Never limit by tenant scope — this is the whole point of a platform console.
+   */
+  async listSubscriptions(cursor?: string, limit = 50) {
+    const filter: Record<string, unknown> = {};
+    if (cursor) filter._id = { $lt: new Types.ObjectId(cursor) };
+
+    const subs = await Subscription.find(filter).sort({ _id: -1 }).limit(limit).lean();
+    const orgIds = subs.map((s) => s.organizationId);
+    const orgs = await Organization.find({ _id: { $in: orgIds } })
+      .select('name ownerUserId plan')
+      .lean();
+    const ownerIds = orgs.map((o) => o.ownerUserId);
+    const owners = await User.find({ _id: { $in: ownerIds } }).select('email name').lean();
+    const orgById = new Map(orgs.map((o) => [String(o._id), o]));
+    const ownerById = new Map(owners.map((u) => [String(u._id), u]));
+
+    return {
+      subscriptions: subs.map((s) => {
+        const org = orgById.get(String(s.organizationId));
+        const owner = org ? ownerById.get(String(org.ownerUserId)) : undefined;
+        return {
+          id: String(s._id),
+          organizationId: String(s.organizationId),
+          organizationName: org?.name ?? '—',
+          ownerEmail: owner?.email ?? '—',
+          ownerName: owner?.name ?? '—',
+          plan: s.plan,
+          status: s.status,
+          seats: s.seats,
+          razorpaySubscriptionId: s.razorpaySubscriptionId ?? null,
+          currentPeriodEnd: s.currentPeriodEnd ?? null,
+          createdAt: s.createdAt,
+        };
+      }),
+      nextCursor: subs.length === limit ? String(subs[subs.length - 1]!._id) : null,
+    };
+  },
+
+  /**
+   * Platform-wide Razorpay payment records. These are business payments
+   * (invoice receipts, bill payments) tagged with method='razorpay'.
+   * Actual subscription billing is handled by Razorpay webhooks.
+   */
+  async listPayments(cursor?: string, limit = 50) {
+    const filter: Record<string, unknown> = { method: 'razorpay' };
+    if (cursor) filter._id = { $lt: new Types.ObjectId(cursor) };
+
+    const payments = await Payment.find(filter)
+      .sort({ _id: -1 })
+      .limit(limit)
+      .setOptions({ skipTenantScope: true })
+      .lean();
+
+    const companyIds = [...new Set(payments.map((p) => String(p.companyId)))];
+    const companies = await Company.find({ _id: { $in: companyIds } })
+      .select('legalName organizationId')
+      .lean();
+    const companyById = new Map(companies.map((c) => [String(c._id), c]));
+
+    return {
+      payments: payments.map((p) => {
+        const co = companyById.get(String(p.companyId));
+        return {
+          id: String(p._id),
+          paymentNumber: p.paymentNumber,
+          companyId: String(p.companyId),
+          companyName: co?.legalName ?? '—',
+          direction: p.direction,
+          amountPaise: p.amountPaise,
+          method: p.method,
+          reference: p.reference ?? null,
+          date: p.date,
+          createdAt: p.createdAt,
+        };
+      }),
+      nextCursor: payments.length === limit ? String(payments[payments.length - 1]!._id) : null,
+    };
+  },
+
+  /**
+   * Lightweight activity feed: newest users + companies + subscription changes.
+   * Pulls from real records; does not require a separate activity log table.
+   */
+  async listActivities(limit = 40) {
+    const [recentUsers, recentCompanies, recentSubs] = await Promise.all([
+      User.find({})
+        .select('email name createdAt')
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean(),
+      Company.find({})
+        .select('legalName createdAt organizationId')
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean(),
+      Subscription.find({})
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .lean(),
+    ]);
+
+    const orgIds = recentCompanies.map((c) => c.organizationId);
+    const orgs = await Organization.find({ _id: { $in: orgIds } }).select('name').lean();
+    const orgById = new Map(orgs.map((o) => [String(o._id), o]));
+
+    type ActivityItem = { type: string; description: string; at: Date };
+    const activities: ActivityItem[] = [
+      ...recentUsers.map((u) => ({
+        type: 'user_registered',
+        description: `New user: ${u.name} (${u.email})`,
+        at: u.createdAt,
+      })),
+      ...recentCompanies.map((c) => ({
+        type: 'company_created',
+        description: `New company: ${c.legalName} — org: ${orgById.get(String(c.organizationId))?.name ?? '?'}`,
+        at: c.createdAt,
+      })),
+      ...recentSubs.map((s) => ({
+        type: 'subscription_updated',
+        description: `Subscription ${s.status}: plan=${s.plan}, org=${String(s.organizationId)}`,
+        at: s.updatedAt,
+      })),
+    ];
+
+    activities.sort((a, b) => b.at.getTime() - a.at.getTime());
+    return { activities: activities.slice(0, limit) };
   },
 
   /**

@@ -57,6 +57,7 @@ interface PublicUser {
   id: string;
   email: string;
   name: string;
+  superAdmin?: boolean;
 }
 interface CompanyRow {
   id: string;
@@ -186,6 +187,9 @@ function AuthPage({
       );
       setAccessToken(data.accessToken);
       onLoggedIn(data.user);
+      if (data.user?.superAdmin) {
+        window.location.hash = '#admin';
+      }
     } catch (err) {
       setError(err);
     } finally {
@@ -752,6 +756,28 @@ function AuthPage({
               >
                 {mode === 'login' ? 'New here? Create an account' : 'Already registered? Sign in'}
               </button>
+              <div style={{ textAlign: 'center', marginTop: 4 }}>
+                <a
+                  href="#admin"
+                  style={{
+                    color: 'var(--muted)',
+                    fontSize: '13px',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontWeight: 500,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--accent)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--muted)';
+                  }}
+                >
+                  <span>🛡️ Platform Operator / Admin Sign in →</span>
+                </a>
+              </div>
             </div>
           </form>
         </div>
@@ -805,6 +831,33 @@ function CompanyPicker({
         <Logo size="1.35rem" />
         <ThemeToggle />
       </div>
+      {user.superAdmin && (
+        <div
+          style={{
+            marginBottom: '1rem',
+            padding: '1rem',
+            borderRadius: 12,
+            background: 'rgba(255, 68, 4, 0.1)',
+            border: '1px solid rgba(255, 68, 4, 0.3)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '0.9rem' }}>
+              Platform Super Admin
+            </div>
+            <div style={{ color: 'var(--muted)', fontSize: '0.78rem' }}>
+              Your account has full operator privileges across the entire platform.
+            </div>
+          </div>
+          <Btn kind="primary" small onClick={() => { window.location.hash = '#admin'; }}>
+            Open Admin Console
+          </Btn>
+        </div>
+      )}
       <Card title={`Choose a company — ${user.email}`}>
         <Err error={companies.error} />
         {(companies.data?.companies ?? []).map((c, i) => (
@@ -1521,6 +1574,39 @@ function Shell({
               </kbd>
             </div>
 
+            {/* Super Admin Switcher */}
+            {user.superAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = '#admin';
+                }}
+                title="Open Super Admin Console"
+                style={{
+                  background: 'rgba(255, 68, 4, 0.12)',
+                  border: '1px solid rgba(255, 68, 4, 0.35)',
+                  color: 'var(--accent)',
+                  padding: '0.4rem 0.85rem',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 68, 4, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 68, 4, 0.12)';
+                }}
+              >
+                <span>🛡️ Admin Console</span>
+              </button>
+            )}
+
             {/* Theme Toggle */}
             <ThemeToggle />
 
@@ -1623,6 +1709,17 @@ function isAdminRoute(): boolean {
   return window.location.hash.replace(/^#\/?/, '').split(/[?/]/)[0] === 'admin';
 }
 
+const USER_KEY = 'fp-session-user';
+
+function getStoredUser(): PublicUser | null {
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as PublicUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function App() {
   const [adminRoute, setAdminRoute] = useState(isAdminRoute);
   useEffect(() => {
@@ -1630,9 +1727,19 @@ export function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUserState] = useState<PublicUser | null>(getStoredUser);
+  const setUser = (u: PublicUser | null) => {
+    setUserState(u);
+    try {
+      if (u) sessionStorage.setItem(USER_KEY, JSON.stringify(u));
+      else sessionStorage.removeItem(USER_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const [company, setCompany] = useState<CompanyRow | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getStoredUser());
   const [authView, setAuthView] = useState<'landing' | 'auth'>(() => {
     const hash = window.location.hash;
     return hash.startsWith('#login') || hash.startsWith('#register') ? 'auth' : 'landing';
@@ -1668,6 +1775,16 @@ export function App() {
         if (!active) return;
         setAccessToken(data.accessToken);
         setUser(data.user);
+        if (
+          data.user?.superAdmin &&
+          (window.location.hash === '#login' ||
+            window.location.hash === '#register' ||
+            !window.location.hash ||
+            window.location.hash === '#' ||
+            window.location.hash === '#/')
+        ) {
+          window.location.hash = '#admin';
+        }
         try {
           const savedCompId = localStorage.getItem('fp-company-id');
           const comps = await api<{ companies: CompanyRow[] }>(
@@ -1688,7 +1805,14 @@ export function App() {
           /* ignore company fetch error */
         }
       })
-      .catch(() => undefined)
+      .catch((err) => {
+        const failure = err as { status?: number };
+        // Only clear session if explicitly unauthorized (401 or 403)
+        if (failure?.status === 401 || failure?.status === 403) {
+          setUser(null);
+          setAccessToken(null);
+        }
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -1700,16 +1824,24 @@ export function App() {
 
   useEffect(() => {
     if (!user) return;
-    const renew = () => {
+    const keepalive = () => {
+      // 1. Keep backend server warm (prevent Render free-tier from sleeping after 15m)
+      fetch('/healthz').catch(() => undefined);
+      // 2. Keep the auth session refreshed
       void attemptSilentRefresh();
     };
-    // Keep session alive periodically in the background (every 10 minutes)
-    const interval = setInterval(renew, 10 * 60 * 1000);
-    // Refresh immediately when returning to tab after being away
-    window.addEventListener('focus', renew);
+    // Ping every 3 minutes (180s) to keep session fresh and ensure backend never sleeps
+    const interval = setInterval(keepalive, 3 * 60 * 1000);
+    // Refresh immediately when returning to tab or window focus
+    window.addEventListener('focus', keepalive);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') keepalive();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', renew);
+      window.removeEventListener('focus', keepalive);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [user]);
 
@@ -1717,6 +1849,7 @@ export function App() {
     void api('POST', '/api/v1/auth/logout', {}, { silent: true }).catch(() => undefined);
     try {
       localStorage.removeItem('fp-company-id');
+      sessionStorage.removeItem(USER_KEY);
     } catch {
       /* ignore */
     }

@@ -167,6 +167,44 @@ adminRoutes.get(
 );
 
 adminRoutes.get(
+  '/users/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    // Single-user view: query by id via listUsers with the id as search fallback
+    const userId = String(req.params.id);
+    const result = await adminService.listUsers(undefined, userId);
+    const user = result.users.find((u) => u.id === userId) ?? result.users[0] ?? null;
+    if (!user) {
+      const { AppError } = await import('../../utils/AppError');
+      throw new AppError('SYS_NOT_FOUND', 404);
+    }
+    ok(res, { user });
+  }),
+);
+
+adminRoutes.get(
+  '/subscriptions',
+  asyncHandler(async (req: Request, res: Response) => {
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    ok(res, await adminService.listSubscriptions(cursor));
+  }),
+);
+
+adminRoutes.get(
+  '/payments',
+  asyncHandler(async (req: Request, res: Response) => {
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    ok(res, await adminService.listPayments(cursor));
+  }),
+);
+
+adminRoutes.get(
+  '/activities',
+  asyncHandler(async (_req: Request, res: Response) => {
+    ok(res, await adminService.listActivities());
+  }),
+);
+
+adminRoutes.get(
   '/organizations',
   asyncHandler(async (req: Request, res: Response) => {
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;

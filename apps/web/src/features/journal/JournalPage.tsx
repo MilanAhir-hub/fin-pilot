@@ -18,10 +18,12 @@ interface EntryDto {
   entryNumber: string;
   date: string;
   narration: string;
-  status: 'posted' | 'returned';
+  status: 'posted' | 'reversed' | 'returned';
   totalDebitPaise: number;
   lines: EntryLineDto[];
-  returnedByEntryId: string | null;
+  reversesEntryId?: string | null;
+  reversedByEntryId?: string | null;
+  returnedByEntryId?: string | null;
 }
 
 interface FormLine {
@@ -121,7 +123,17 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
   async function reverse(id: string) {
     setError(null);
     try {
-      await api('POST', `/api/v1/journal-entries/${id}/return`, { reason: 'returned from UI' });
+      // 1. Try standard /reverse first (matches live deployed backend)
+      // 2. Fall back to /return if needed
+      try {
+        await api('POST', `/api/v1/journal-entries/${id}/reverse`, { reason: 'Reversed from Day book' });
+      } catch (err: any) {
+        if (err instanceof RequestError && err.status === 404) {
+          await api('POST', `/api/v1/journal-entries/${id}/return`, { reason: 'Reversed from Day book' });
+        } else {
+          throw err;
+        }
+      }
       await load();
     } catch (err) {
       setError(err instanceof RequestError ? err.error.message : 'Return failed');
@@ -262,6 +274,14 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
 
       {entries.map((entry) => {
         const isExpanded = expandedIds.has(entry.id);
+        const isReversed =
+          entry.status === 'reversed' ||
+          entry.status === 'returned' ||
+          Boolean(entry.reversedByEntryId) ||
+          Boolean(entry.returnedByEntryId);
+        const isReversal = Boolean(entry.reversesEntryId);
+        const canReturn = entry.status === 'posted' && !isReversed && !isReversal;
+
         return (
           <div
             key={entry.id}
@@ -271,7 +291,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
               marginBottom: '0.65rem',
               background: C.panel,
               boxShadow: 'var(--shadow)',
-              opacity: entry.status === 'returned' ? 0.6 : 1,
+              opacity: isReversed ? 0.6 : 1,
               transition: 'background 0.15s ease, box-shadow 0.15s ease',
             }}
           >
@@ -366,7 +386,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
                 {formatINR(entry.totalDebitPaise)}
               </span>
 
-              {entry.status === 'posted' && !entry.returnedByEntryId ? (
+              {canReturn ? (
                 <button
                   type="button"
                   style={{
@@ -386,6 +406,20 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
                 >
                   return
                 </button>
+              ) : isReversal ? (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: C.amber,
+                    border: 'none',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  reversal
+                </span>
               ) : (
                 <span
                   style={{
@@ -398,7 +432,7 @@ export function JournalPage({ accounts }: { accounts: AccountRow[] }) {
                     fontWeight: 600,
                   }}
                 >
-                  {entry.status}
+                  {isReversed ? 'reversed' : entry.status}
                 </span>
               )}
             </div>

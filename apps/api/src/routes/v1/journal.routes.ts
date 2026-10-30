@@ -25,3 +25,9 @@ journalRoutes.post(
   validate(reverseJournalEntrySchema),
   asyncHandler(ctrl.reverse),
 );
+journalRoutes.post(
+  '/:id/return',
+  authorize('journal:reverse'),
+  validate(reverseJournalEntrySchema),
+  asyncHandler(ctrl.reverse),
+);

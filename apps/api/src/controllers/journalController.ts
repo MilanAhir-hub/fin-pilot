@@ -24,6 +24,7 @@ function dto(entry: JournalEntryDoc) {
     status: entry.status,
     reversesEntryId: entry.reversesEntryId ? String(entry.reversesEntryId) : null,
     reversedByEntryId: entry.reversedByEntryId ? String(entry.reversedByEntryId) : null,
+    returnedByEntryId: entry.reversedByEntryId ? String(entry.reversedByEntryId) : null,
     postedAt: entry.postedAt,
   };
 }

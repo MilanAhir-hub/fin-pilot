@@ -5,13 +5,27 @@
  * response flip the loud banner (§32 Phase 23).
  */
 
-let accessToken: string | null = null;
+const TOKEN_KEY = 'fp-session-token';
+
+let accessToken: string | null = (() => {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+})();
 let companyId: string | null = null;
 let impersonation: { sessionId: string; by: string } | null = null;
 const impersonationListeners = new Set<(v: { sessionId: string; by: string } | null) => void>();
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 export function getCompanyId(): string | null {
   return companyId;
@@ -109,15 +123,23 @@ export async function attemptSilentRefresh(): Promise<string | null> {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!res.ok) return null;
+      if (res.status === 401 || res.status === 403) {
+        setAccessToken(null);
+        return null;
+      }
+      if (!res.ok) {
+        // Render cold start or gateway spinup (502/503) — retain current accessToken
+        return accessToken;
+      }
       const json = (await res.json().catch(() => ({}))) as { data?: { accessToken: string } };
       if (json.data?.accessToken) {
         setAccessToken(json.data.accessToken);
         return json.data.accessToken;
       }
-      return null;
+      return accessToken;
     } catch {
-      return null;
+      // Temporary network error during server wakeup — do not destroy active session
+      return accessToken;
     } finally {
       refreshPromise = null;
     }
