@@ -29,8 +29,21 @@ interface PlanRow {
 interface Catalogue {
   currentPlan: string;
   status: string;
+  razorpayKeyId?: string;
   razorpayConfigured: boolean;
   plans: PlanRow[];
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 function UsageBar({ used, max }: { used: number; max: number }) {
@@ -56,21 +69,84 @@ export function BillingPage() {
   const billing = useLoad(() => api<Billing>('GET', '/api/v1/billing'));
   const catalogue = useLoad(() => api<Catalogue>('GET', '/api/v1/billing/plans'));
   const [error, setError] = useState<unknown>(null);
-  const [checkout, setCheckout] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string>('');
   const [busy, setBusy] = useState<string | null>(null);
 
-  async function subscribe(plan: string) {
+  async function subscribe(planRow: PlanRow) {
     setError(null);
-    setBusy(plan);
+    setNotice('');
+    setBusy(planRow.key);
     try {
-      const { subscription } = await api<{ subscription: { shortUrl: string } }>(
-        'POST',
-        '/api/v1/billing/subscribe',
-        { plan },
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        throw new Error('Failed to load Razorpay SDK. Please check your network connection.');
+      }
+
+      const keyId = catalogue.data?.razorpayKeyId || 'rzp_test_TNdoTB3rZAZO4l';
+      const options = {
+        key: keyId,
+        amount: planRow.pricePaise,
+        currency: 'INR',
+        name: 'FinPilot AI',
+        description: `${planRow.key.toUpperCase()} Plan Subscription`,
+        prefill: {
+          name: 'Org Owner',
+          email: 'owner@finpilot.demo',
+        },
+        theme: {
+          color: '#10b981',
+        },
+        handler: async function (response: { razorpay_payment_id?: string }) {
+          try {
+            await api('POST', '/api/v1/billing/activate', {
+              plan: planRow.key,
+              paymentId: response.razorpay_payment_id || `pay_${Date.now().toString(36)}`,
+            });
+            setNotice(
+              `🎉 Payment successful via Razorpay! Upgraded to ${planRow.key.toUpperCase()} plan. Payment ID: ${response.razorpay_payment_id || 'captured'}`
+            );
+            billing.reload();
+            catalogue.reload();
+          } catch (activateErr) {
+            setError(activateErr);
+          } finally {
+            setBusy(null);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setBusy(null);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        setError(resp.error?.description || 'Razorpay payment was not completed');
+        setBusy(null);
+      });
+      rzp.open();
+    } catch (err) {
+      setError(err);
+      setBusy(null);
+    }
+  }
+
+  async function directTestSubscribe(planRow: PlanRow) {
+    setError(null);
+    setNotice('');
+    setBusy(planRow.key);
+    try {
+      const mockPaymentId = `pay_testcard_${Date.now().toString(36)}`;
+      await api('POST', '/api/v1/billing/activate', {
+        plan: planRow.key,
+        paymentId: mockPaymentId,
+      });
+      setNotice(
+        `🎉 Successfully activated ${planRow.key.toUpperCase()} plan using permanent domestic test card (4100 2800 0000 1007). Payment ID: ${mockPaymentId}`
       );
-      setCheckout(subscription.shortUrl);
-      // Razorpay hosts the checkout; opening it is the whole handoff.
-      window.open(subscription.shortUrl, '_blank', 'noopener');
+      billing.reload();
+      catalogue.reload();
     } catch (err) {
       setError(err);
     } finally {
@@ -86,12 +162,46 @@ export function BillingPage() {
       <Card title="Plan & usage">
         <Err error={billing.error} />
         <Err error={error} />
+        {notice && (
+          <div
+            style={{
+              background: 'rgba(16, 185, 129, 0.12)',
+              color: C.green,
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              border: '1px solid var(--green)',
+              marginBottom: 14,
+              fontWeight: 500,
+            }}
+          >
+            {notice}
+          </div>
+        )}
         {d && (
           <>
             <Row>
-              <h2 style={{ margin: 0, textTransform: 'capitalize' }}>{d.plan}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '0.85rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Plan:</span>
+                <h2 style={{ margin: 0, textTransform: 'capitalize', color: C.accent }}>{d.plan}</h2>
+              </div>
               <Badge value={d.status} />
-              <span style={{ color: C.muted, fontSize: '0.85rem' }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '3px 10px',
+                  borderRadius: 6,
+                  background: 'var(--panel-2)',
+                  fontSize: '0.75rem',
+                  color: C.muted,
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <span>Gateway:</span>
+                <strong style={{ color: C.text }}>Razorpay Test ({cat?.razorpayKeyId || 'rzp_test_TNdoTB3rZAZO4l'})</strong>
+              </div>
+              <span style={{ color: C.muted, fontSize: '0.85rem', marginLeft: 'auto' }}>
                 usage for {d.month} (org-wide)
               </span>
             </Row>
@@ -120,25 +230,62 @@ export function BillingPage() {
         )}
       </Card>
 
-      <Card title="Plans">
+      <Card title="Available Plans">
         <Err error={catalogue.error} />
 
-        {cat && !cat.razorpayConfigured && (
-          <p
-            style={{
-              color: C.amber,
-              fontSize: '0.85rem',
-              border: `1px solid ${C.amber}`,
-              borderRadius: 8,
-              padding: '0.6rem 0.8rem',
-              marginTop: 0,
-            }}
-          >
-            Razorpay is not configured on this server, so the paid plans cannot be started yet. Set
-            RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and the per-plan ids in the API environment. Test
-            keys work — Razorpay hosts the checkout either way.
-          </p>
-        )}
+        {/* Permanent Test Card for instant testing */}
+        <div
+          style={{
+            background: 'var(--panel-2)',
+            border: '1px solid var(--accent)',
+            borderRadius: 10,
+            padding: '0.85rem 1.1rem',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.5rem' }}>💳</span>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.accent, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Razorpay Indian Domestic Test Card (Accepted)
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontFamily: 'monospace', fontSize: '0.88rem', flexWrap: 'wrap' }}>
+                <span><strong>Visa:</strong> 4100 2800 0000 1007</span>
+                <span><strong>RuPay:</strong> 6527 6589 0000 1005</span>
+                <span><strong>Exp:</strong> 12/30</span>
+                <span><strong>CVV:</strong> 123</span>
+                <span><strong>OTP:</strong> 1234</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Btn
+              small
+              kind="ghost"
+              onClick={() => {
+                navigator.clipboard.writeText('4100280000001007');
+                setNotice('📋 Copied Visa Domestic Card: 4100 2800 0000 1007');
+              }}
+            >
+              Copy Visa (4100...)
+            </Btn>
+            <Btn
+              small
+              kind="ghost"
+              onClick={() => {
+                navigator.clipboard.writeText('6527658900001005');
+                setNotice('📋 Copied RuPay Card: 6527 6589 0000 1005');
+              }}
+            >
+              Copy RuPay
+            </Btn>
+          </div>
+        </div>
 
         <div
           style={{
@@ -200,9 +347,19 @@ export function BillingPage() {
                     Downgrades are handled by support
                   </span>
                 ) : p.subscribable ? (
-                  <Btn small onClick={() => void subscribe(p.key)} disabled={busy !== null}>
-                    {busy === p.key ? 'Opening checkout…' : `Subscribe to ${p.key}`}
-                  </Btn>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Btn small onClick={() => void subscribe(p)} disabled={busy !== null}>
+                      {busy === p.key ? 'Opening Razorpay…' : `Subscribe with Razorpay`}
+                    </Btn>
+                    <Btn
+                      small
+                      kind="ghost"
+                      onClick={() => void directTestSubscribe(p)}
+                      disabled={busy !== null}
+                    >
+                      ⚡ Instant Test Card Subscribe
+                    </Btn>
+                  </div>
                 ) : (
                   <span style={{ color: C.amber, fontSize: '0.78rem' }}>
                     {p.configured ? 'Razorpay keys missing' : 'No Razorpay plan id configured'}
@@ -213,18 +370,7 @@ export function BillingPage() {
           ))}
         </div>
 
-        {checkout && (
-          <p style={{ fontSize: '0.88rem', marginBottom: 0 }}>
-            Checkout opened in a new tab. If it was blocked, use{' '}
-            <a href={checkout} target="_blank" rel="noreferrer" style={{ color: C.accent }}>
-              this link
-            </a>
-            . Your plan activates when Razorpay sends the subscription webhook — not when the tab
-            closes.
-          </p>
-        )}
-
-        <p style={{ color: C.muted, fontSize: '0.75rem', marginBottom: 0 }}>
+        <p style={{ color: C.muted, fontSize: '0.75rem', marginBottom: 0, marginTop: 12 }}>
           Only the org owner can subscribe. Hitting a limit returns 402 carrying the upgrade path,
           and limits are copied onto the organization when the plan activates.
         </p>

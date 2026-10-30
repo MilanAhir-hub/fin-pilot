@@ -11,7 +11,7 @@ async function run() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
   });
-  const loginJson = await loginRes.json();
+  const loginJson = (await loginRes.json()) as any;
   const token = loginJson.data.accessToken;
   console.log('Logged in as:', loginJson.data.user.email);
 
@@ -19,7 +19,7 @@ async function run() {
   const compRes = await fetch(`${API}/api/v1/companies`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const compJson = await compRes.json();
+  const compJson = (await compRes.json()) as any;
   const company = compJson.data.companies[0];
   console.log('Company:', company.legalName, 'ID:', company.id);
 
@@ -32,7 +32,7 @@ async function run() {
 
   console.log('\n--- 3. Check Bank Accounts ---');
   let bankRes = await fetch(`${API}/api/v1/bank-accounts`, { headers: authHeaders });
-  let bankJson = await bankRes.json();
+  let bankJson = (await bankRes.json()) as any;
   let bankAccounts = bankJson.data.bankAccounts;
   console.log('Found bank accounts:', bankAccounts.length);
 
@@ -49,7 +49,7 @@ async function run() {
         ifsc: 'HDFC0001234',
       }),
     });
-    const createJson = await createRes.json();
+    const createJson = (await createRes.json()) as any;
     bankId = createJson.data.bankAccount._id || createJson.data.bankAccount.id;
     console.log('Created bank account ID:', bankId);
   } else {
@@ -59,7 +59,7 @@ async function run() {
 
   console.log('\n--- 4. Check Existing Payments / Journal Entries on Bank Ledger ---');
   const paymentsRes = await fetch(`${API}/api/v1/payments`, { headers: authHeaders });
-  const paymentsJson = await paymentsRes.json();
+  const paymentsJson = (await paymentsRes.json()) as any;
   const payments = paymentsJson.data.payments || [];
   console.log(`Found ${payments.length} existing payments in system.`);
   const samplePayment = payments[0];
@@ -108,7 +108,7 @@ async function run() {
   const txnsRes = await fetch(`${API}/api/v1/bank-accounts/${bankId}/transactions`, {
     headers: authHeaders,
   });
-  const txnsJson = await txnsRes.json();
+  const txnsJson = (await txnsRes.json()) as any;
   const txns = txnsJson.data.transactions || [];
   console.log(`Bank account now has ${txns.length} transactions:`);
   txns.slice(0, 5).forEach((t: any) => {
@@ -119,7 +119,7 @@ async function run() {
   const recoRes = await fetch(`${API}/api/v1/reconciliation/suggestions?bankAccountId=${bankId}`, {
     headers: authHeaders,
   });
-  const recoJson = await recoRes.json();
+  const recoJson = (await recoRes.json()) as any;
   const suggestions = recoJson.data.suggestions || [];
   console.log(`Found ${suggestions.length} reconciliation suggestions:`);
   suggestions.forEach((s: any) => {
@@ -142,14 +142,14 @@ async function run() {
         ],
       }),
     });
-    const confirmJson = await confirmRes.json();
+    const confirmJson = (await confirmRes.json()) as any;
     console.log('Confirm match response:', confirmJson);
 
     // Verify transaction status changed to reconciled
     const checkTxnRes = await fetch(`${API}/api/v1/bank-accounts/${bankId}/transactions`, {
       headers: authHeaders,
     });
-    const checkTxnJson = await checkTxnRes.json();
+    const checkTxnJson = (await checkTxnRes.json()) as any;
     const updatedTxn = checkTxnJson.data.transactions.find(
       (t: any) => t._id === toConfirm.bankTransactionId || t.id === toConfirm.bankTransactionId
     );

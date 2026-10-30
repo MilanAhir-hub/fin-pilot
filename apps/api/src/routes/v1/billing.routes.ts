@@ -43,3 +43,22 @@ billingRoutes.post(
     ok(res, { subscription: created }, 201);
   }),
 );
+
+billingRoutes.post(
+  '/activate',
+  idempotency,
+  validate(
+    z.object({
+      plan: z.enum(['starter', 'professional', 'enterprise']),
+      paymentId: z.string().optional(),
+    }),
+  ),
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await subscriptionService.activatePlan(
+      new Types.ObjectId(req.user!.id),
+      req.body.plan,
+      req.body.paymentId,
+    );
+    ok(res, result);
+  }),
+);

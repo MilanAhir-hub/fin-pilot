@@ -9,6 +9,7 @@
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createWorker, type Worker } from 'tesseract.js';
 import { logger } from '../config/logger';
 
@@ -18,15 +19,19 @@ const LANGUAGE = process.env.OCR_LANG ?? 'eng';
  * Where the ~5 MB language model is cached. Left to itself tesseract.js drops
  * `eng.traineddata` into the process's working directory, which means a stray
  * blob in the repo and a re-download for every different cwd.
+ * In production/cloud containers (e.g. Render/Linux), we use the system temp directory
+ * where write permissions are guaranteed.
  */
 const CACHE_PATH =
   process.env.OCR_CACHE_PATH ??
-  join(
-    dirname(createRequire(import.meta.url).resolve('tesseract.js/package.json')),
-    '..',
-    '.cache',
-    'tesseract',
-  );
+  (process.env.NODE_ENV === 'production'
+    ? join(tmpdir(), 'tesseract')
+    : join(
+        dirname(createRequire(import.meta.url).resolve('tesseract.js/package.json')),
+        '..',
+        '.cache',
+        'tesseract',
+      ));
 
 let worker: Promise<Worker> | null = null;
 let tail: Promise<unknown> = Promise.resolve();
@@ -36,6 +41,7 @@ function getWorker(): Promise<Worker> {
     mkdirSync(CACHE_PATH, { recursive: true });
     return createWorker(LANGUAGE, undefined, { cachePath: CACHE_PATH });
   })().catch((err: unknown) => {
+    logger.error({ err }, 'failed to initialize tesseract worker');
     worker = null; // a failed start must not poison every later upload
     throw err;
   });
@@ -55,7 +61,8 @@ export interface Recognition {
   confidence: number;
 }
 
-const OCR_PAGE_TIMEOUT_MS = 10_000;
+/** Cloud containers need more headroom on cold start to download traineddata and init WASM. */
+const OCR_PAGE_TIMEOUT_MS = Number(process.env.OCR_PAGE_TIMEOUT_MS ?? 60_000);
 
 export async function recognize(images: readonly Buffer[]): Promise<Recognition> {
   if (images.length === 0) return { text: '', confidence: 0 };

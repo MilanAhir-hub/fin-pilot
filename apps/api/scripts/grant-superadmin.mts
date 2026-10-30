@@ -88,7 +88,7 @@ try {
     if (memberships > 0) {
       console.error(
         `refusing: ${email} belongs to ${memberships} compan${memberships === 1 ? 'y' : 'ies'}.\n` +
-          'Operators may not be customers — create a separate operator account instead.',
+        'Operators may not be customers — create a separate operator account instead.',
       );
       process.exit(1);
     }

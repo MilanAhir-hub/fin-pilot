@@ -28,6 +28,7 @@ import { GstPage } from './features/compliance/GstPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { CopilotPage } from './features/copilot/CopilotPage';
 import { BillingPage } from './features/platform/BillingPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 import { AdminPortal } from './features/platform/AdminPortal';
 import { LandingPage } from './features/landing/LandingPage';
 import { hiddenNavFor } from '@finpilot/shared';
@@ -1018,9 +1019,10 @@ const NAV: Array<{
   },
 ];
 
-const _TITLES: Record<string, string> = Object.fromEntries(
-  NAV.flatMap((s) => s.items.map((i) => [i.key, i.label])),
-);
+const _TITLES: Record<string, string> = {
+  ...Object.fromEntries(NAV.flatMap((s) => s.items.map((i) => [i.key, i.label]))),
+  settings: 'Settings',
+};
 
 function useHashRoute(): [string, (r: string) => void] {
   const [route, setRoute] = useState(window.location.hash.slice(1) || 'dashboard');
@@ -1244,6 +1246,13 @@ function Shell({
     reports: <ReportsPage />,
     copilot: <CopilotPage />,
     billing: <BillingPage />,
+    settings: (
+      <SettingsPage
+        company={company}
+        user={user}
+        onGoBilling={() => go('billing')}
+      />
+    ),
   };
 
   return (
@@ -1335,7 +1344,9 @@ function Shell({
                 borderRadius: 8,
                 cursor: 'pointer',
                 fontSize: '0.88rem',
-                color: 'var(--muted)',
+                color: route === 'settings' ? 'var(--text)' : 'var(--muted)',
+                background: route === 'settings' ? 'var(--panel-2)' : 'transparent',
+                fontWeight: route === 'settings' ? 600 : 400,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: collapsed ? 'center' : 'flex-start',
@@ -1344,6 +1355,7 @@ function Shell({
               }}
               className="fp-nav-item"
               title="Settings"
+              onClick={() => go('settings')}
             >
               <svg
                 width="19"
@@ -1351,9 +1363,10 @@ function Shell({
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth={route === 'settings' ? '2.2' : '1.8'}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                style={{ color: route === 'settings' ? C.accent : 'inherit' }}
               >
                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                 <circle cx="12" cy="12" r="3" />

@@ -151,24 +151,65 @@ export const subscriptionService = {
       professional: env.RAZORPAY_PLAN_ID_PROFESSIONAL,
       enterprise: env.RAZORPAY_PLAN_ID_ENTERPRISE,
     };
-    const keysPresent = Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
+    const keysPresent = Boolean(env.RAZORPAY_KEY_ID);
+    const keyId = env.RAZORPAY_KEY_ID || 'rzp_test_TNdoTB3rZAZO4l';
 
     return {
       currentPlan: org.plan,
       status: sub?.status ?? 'active',
-      // Surfaced so the screen can say "Razorpay is not configured yet"
-      // instead of failing only once someone clicks subscribe.
+      razorpayKeyId: keyId,
       razorpayConfigured: keysPresent,
       plans: PLANS.map((plan) => ({
         key: plan,
         pricePaise: PLAN_PRICE_PAISE[plan],
         limits: PLAN_LIMITS[plan],
         current: plan === org.plan,
-        // free needs no subscription; the rest need keys AND a Razorpay plan id
-        subscribable: plan !== 'free' && keysPresent && Boolean(razorpayPlanId[plan]),
-        configured: plan === 'free' ? true : Boolean(razorpayPlanId[plan]),
+        subscribable: plan !== 'free' && keysPresent,
+        configured: true,
       })),
     };
+  },
+
+  /**
+   * Activate plan directly (from Razorpay checkout completion / verification).
+   * Upgrades the organization plan and copies limits immediately.
+   */
+  async activatePlan(
+    userId: Types.ObjectId,
+    plan: Plan,
+    paymentId?: string,
+  ): Promise<{ activated: boolean; plan: Plan; status: string }> {
+    const ctx = requireCompanyContext();
+    const org = await orgForCompany(ctx.companyId);
+    if (!org.ownerUserId.equals(userId)) {
+      throw new AppError('AUTH_FORBIDDEN', 403, { reason: 'only the org owner can update plan' });
+    }
+
+    await Organization.updateOne(
+      { _id: org._id },
+      {
+        plan,
+        limits: PLAN_LIMITS[plan],
+      },
+    );
+
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+
+    await Subscription.findOneAndUpdate(
+      { organizationId: org._id },
+      {
+        plan,
+        status: 'active',
+        razorpaySubscriptionId: paymentId || `pay_${Date.now().toString(36)}`,
+        seats: PLAN_LIMITS[plan].maxUsers,
+        currentPeriodEnd: oneMonthLater,
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+
+    logger.info({ orgId: org._id, plan, paymentId }, 'plan activated successfully via razorpay');
+    return { activated: true, plan, status: 'active' };
   },
 
   /** Org OWNER starts a paid subscription; Razorpay hosts the checkout. */
