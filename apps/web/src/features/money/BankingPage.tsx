@@ -38,15 +38,13 @@ interface BankTxn {
 }
 interface Suggestion {
   bankTransactionId: string;
+  journalEntryId: string;
+  entryNumber: string;
+  score: number;
   narration?: string;
   amountPaise?: number;
-  candidates: Array<{
-    documentModel: string;
-    documentId: string;
-    label?: string;
-    score: number;
-    reasons?: string[];
-  }>;
+  direction?: 'credit' | 'debit';
+  reasons?: string[];
 }
 
 const bid = (b: { id?: string; _id?: string }) => String(b.id ?? b._id);
@@ -146,12 +144,27 @@ export function BankingPage() {
     setError(null);
     setNotice('');
     try {
+      const firstLine = csv.trim().split('\n')[0] || '';
+      const cols = firstLine.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+
+      const dateCol = cols.find((c) => /date/i.test(c)) || 'Date';
+      const narrCol = cols.find((c) => /narration|desc/i.test(c)) || 'Narration';
+      const refCol = cols.find((c) => /ref|utr|chq/i.test(c)) || 'Ref';
+      const creditCol = cols.find((c) => /^credit$/i.test(c));
+      const debitCol = cols.find((c) => /^debit$/i.test(c));
+      const amountCol = cols.find((c) => /^amount$/i.test(c)) || 'Amount';
+
+      const mapping =
+        creditCol && debitCol
+          ? { date: dateCol, narration: narrCol, credit: creditCol, debit: debitCol, reference: refCol }
+          : { date: dateCol, narration: narrCol, amount: amountCol, reference: refCol };
+
       const result = await api<{ imported: number; duplicates: number }>(
         'POST',
         `/api/v1/bank-accounts/${active}/import`,
         {
           csv,
-          mapping: { date: 'Date', narration: 'Narration', amount: 'Amount', reference: 'Ref' },
+          mapping,
         },
       );
       setNotice(
@@ -169,15 +182,13 @@ export function BankingPage() {
 
   async function confirm(suggestion: Suggestion) {
     setError(null);
-    const best = suggestion.candidates[0];
-    if (!best) return;
     try {
       await api('POST', '/api/v1/reconciliation/confirm', {
         matches: [
           {
             bankTransactionId: suggestion.bankTransactionId,
-            documentModel: best.documentModel,
-            documentId: best.documentId,
+            journalEntryId: suggestion.journalEntryId,
+            score: suggestion.score,
           },
         ],
       });
@@ -407,23 +418,18 @@ export function BankingPage() {
             <Tbl
               head={['Bank line', 'Amount', 'Best match', 'Score', 'Why', 'Action']}
               empty="No unmatched lines with candidates."
-              rows={(suggestions.data?.suggestions ?? [])
-                .filter((s) => s.candidates.length > 0)
-                .map((s) => {
-                  const best = s.candidates[0]!;
-                  return [
-                    s.narration ?? s.bankTransactionId,
-                    <Money key="a" paise={s.amountPaise ?? null} />,
-                    best.label ?? `${best.documentModel} ${best.documentId.slice(-6)}`,
-                    best.score.toFixed(2),
-                    <span key="w" style={{ fontSize: '0.75rem', color: C.muted }}>
-                      {(best.reasons ?? []).join(', ')}
-                    </span>,
-                    <Btn key="c" small kind="success" onClick={() => void confirm(s)}>
-                      Confirm match
-                    </Btn>,
-                  ];
-                })}
+              rows={(suggestions.data?.suggestions ?? []).map((s) => [
+                s.narration ?? s.bankTransactionId,
+                <Money key="a" paise={s.amountPaise ?? null} />,
+                `Journal ${s.entryNumber}`,
+                s.score.toFixed(2),
+                <span key="w" style={{ fontSize: '0.75rem', color: C.muted }}>
+                  {(s.reasons ?? ['Exact amount']).join(', ')}
+                </span>,
+                <Btn key="c" small kind="success" onClick={() => void confirm(s)}>
+                  Confirm match
+                </Btn>,
+              ])}
             />
           </Card>
 

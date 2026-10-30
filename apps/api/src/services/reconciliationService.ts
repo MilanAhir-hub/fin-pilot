@@ -44,6 +44,10 @@ export interface Suggestion {
   journalEntryId: string;
   entryNumber: string;
   score: number;
+  narration?: string;
+  amountPaise?: number;
+  direction?: 'credit' | 'debit';
+  reasons?: string[];
 }
 
 export const reconciliationService = {
@@ -71,14 +75,25 @@ export const reconciliationService = {
       let best: Suggestion | null = null;
       for (const entry of candidates) {
         if (reconciled.has(String(entry._id))) continue;
-        const score =
-          0.6 + dateScore(txn.txnDate, entry.date) + narrationScore(txn.narration, entry.narration);
+        const dScore = dateScore(txn.txnDate, entry.date);
+        const nScore = narrationScore(txn.narration, entry.narration);
+        const score = 0.6 + dScore + nScore;
+        const reasons: string[] = ['Exact amount'];
+        if (dScore >= 0.25) reasons.push('Same day');
+        else if (dScore >= 0.15) reasons.push('Within 3 days');
+        else if (dScore > 0) reasons.push('Within 7 days');
+        if (nScore > 0) reasons.push('Narration match');
+
         if (!best || score > best.score) {
           best = {
             bankTransactionId: String(txn._id),
             journalEntryId: String(entry._id),
             entryNumber: entry.entryNumber,
             score: Math.round(score * 100) / 100,
+            narration: txn.narration,
+            amountPaise: txn.amountPaise,
+            direction: txn.direction,
+            reasons,
           };
         }
       }
