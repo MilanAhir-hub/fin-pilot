@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FinPilot — Project Walkthrough, In Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c222b; --border:#2a313c;
+    --text:#e6edf3; --muted:#9aa7b4; --accent:#ff6b35; --accent-soft:#2a1a12;
+    --green:#3fb950; --amber:#d29922; --red:#f85149;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f7f8fa; --panel:#fff; --panel2:#f0f2f5; --border:#dfe3e8;
+           --text:#11161d; --muted:#5c6773; --accent:#d9480f; --accent-soft:#fff1e8; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6}
+  code,.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px;display:flex;gap:28px;align-items:flex-start}
+  header{border-bottom:1px solid var(--border);background:var(--panel);margin-bottom:28px}
+  header .wrap{display:block;padding-top:26px;padding-bottom:26px}
+  h1{margin:0 0 6px;font-size:1.6rem;letter-spacing:-.02em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:.92rem;margin:0}
+  nav{flex:0 0 212px;position:sticky;top:18px;background:var(--panel);border:1px solid var(--border);
+      border-radius:10px;padding:10px;max-height:calc(100vh - 36px);overflow:auto}
+  nav .cap{color:var(--muted);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;padding:4px 8px 8px}
+  nav a{display:block;padding:5px 8px;border-radius:6px;color:var(--muted);text-decoration:none;font-size:.8rem;border-left:2px solid transparent}
+  nav a:hover{background:var(--panel2);color:var(--text)}
+  main{flex:1;min-width:0;padding-bottom:70px}
+  section{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px}
+  h2{margin:0 0 4px;font-size:1.08rem;letter-spacing:-.01em;display:flex;gap:10px;align-items:baseline}
+  .num{flex:0 0 auto;color:var(--accent);font-weight:700;font-size:.8rem;
+       background:var(--accent-soft);border-radius:6px;padding:2px 7px;font-family:'JetBrains Mono',monospace}
+  .goal{color:var(--muted);font-size:.8rem;margin:0 0 14px 42px}
+  .say{border-left:3px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0;
+       padding:11px 14px;margin:12px 0}
+  .say b{display:block;font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+  .show,.ask{margin:10px 0 0;font-size:.87rem}
+  .show b,.ask b{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+                 display:block;margin-bottom:4px}
+  .show{border-left:3px solid var(--border);background:transparent;padding-left:11px}
+  .ask{border-left:3px solid var(--amber);padding-left:11px}
+  ul{margin:8px 0;padding-left:20px}
+  li{margin:4px 0}
+  code{background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:.84em}
+  pre{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+      overflow:auto;font-size:.8rem;margin:10px 0}
+  pre code{background:none;border:none;padding:0}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.85rem}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:.68rem;letter-spacing:.07em;
+     text-transform:uppercase;padding:6px 10px;border-bottom:1px solid var(--border)}
+  td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font-size:.7rem;padding:1px 8px;border-radius:999px;
+        border:1px solid var(--border);background:var(--panel2);color:var(--muted)}
+  .pill.ok{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent)}
+  .pill.gap{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 40%,transparent)}
+  .lead{background:linear-gradient(180deg,var(--accent-soft),transparent);border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}
+  .time{float:right;color:var(--muted);font-size:.72rem;font-family:'JetBrains Mono',monospace}
+  @media (max-width:860px){ .wrap{display:block} nav{position:static;max-height:none;margin-bottom:18px} }
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <h1>FinPilot — <span>walkthrough, in order</span></h1>
+  <p class="sub">What to say, section by section, and what to show on screen while saying it. Roughly 15 minutes end to end.</p>
+</div></header>
+
+<div class="wrap">
+<nav>
+  <div class="cap">Order</div>
+  <a href="#s1">1 · The problem</a>
+  <a href="#s2">2 · The rules</a>
+  <a href="#s3">3 · Architecture</a>
+  <a href="#s4">4 · Refusing to boot</a>
+  <a href="#s5">5 · Org → Company → User</a>
+  <a href="#s6">6 · Tenant isolation</a>
+  <a href="#s7">7 · Auth &amp; security</a>
+  <a href="#s8">8 · The ledger</a>
+  <a href="#s9">9 · Numbering &amp; idempotency</a>
+  <a href="#s10">10 · Sales flow</a>
+  <a href="#s11">11 · Purchases</a>
+  <a href="#s12">12 · Banking</a>
+  <a href="#s13">13 · GST &amp; IMS</a>
+  <a href="#s14">14 · Reports</a>
+  <a href="#s15">15 · AI Copilot</a>
+  <a href="#s16">16 · Admin console</a>
+  <a href="#s17">17 · Reliability</a>
+  <a href="#s18">18 · What's incomplete</a>
+  <a href="#s19">19 · Demo click-path</a>
+  <a href="#s20">20 · Likely questions</a>
+</nav>
+
+<main>
+
+<section class="lead" id="s1">
+  <h2><span class="num">01</span> The problem you are solving <span class="time">45s</span></h2>
+  <p class="goal">Open here. Never open with the tech stack — open with why the thing exists.</p>
+  <div class="say"><b>Say</b>
+    "FinPilot is double-entry accounting software for Indian small businesses. The hard part isn't
+    the screens — it's that accounting software is unforgiving. A rupee that rounds wrong, a journal
+    entry that doesn't balance, or an invoice number with a gap in it is not a bug you patch later:
+    it's a legal problem under GST. So I built the correctness rules into the schema and the database,
+    not into the UI."</div>
+  <div class="ask"><b>If asked "why not just use Tally?"</b>
+    Tally is desktop-first and single-company. FinPilot is multi-tenant and multi-company from the
+    data model up — one accountant can hold the books of many businesses, which is the CA-firm case.</div>
+</section>
+
+<section id="s2">
+  <h2><span class="num">02</span> The rules the code cannot break <span class="time">90s</span></h2>
+  <p class="goal">This is your strongest section. Lead with it — it shows engineering judgement, not just CRUD.</p>
+  <div class="say"><b>Say</b>
+    "Before any code, I wrote ten invariants. They live in <code>CLAUDE.md</code> and every one of them
+    is enforced in more than one layer, because any single layer eventually gets bypassed."</div>
+  <p>Explain these four — don't recite all ten:</p>
+  <table>
+    <tr><th>Rule</th><th>How it's enforced</th></tr>
+    <tr><td><b>I1 — Money is an integer number of paise</b></td>
+        <td>No floats, no <code>Decimal128</code>. Every money field name ends in <code>Paise</code>.
+            Formatting happens once, at the React boundary.</td></tr>
+    <tr><td><b>I2 — Every journal entry balances</b></td>
+        <td>sum(debit) === sum(credit), checked in a Mongoose <code>pre('validate')</code> hook,
+            re-asserted inside the transaction before commit, and again by a nightly job. Three layers.</td></tr>
+    <tr><td><b>I3 — One writer to the ledger</b></td>
+        <td>Only <code>GeneralLedger.post()</code> writes to <code>journalentries</code>. The invoice
+            module doesn't know how to debit a receivable — it asks the ledger to.</td></tr>
+    <tr><td><b>I4 — Postings are append-only</b></td>
+        <td>There is no <code>PATCH /journal-entries/:id</code>. A mistake is fixed by posting a
+            reversing entry that references the original.</td></tr>
+  </table>
+  <div class="say"><b>The line to land</b>
+    "Why paise and not decimals? Because floating point can't represent 0.1 exactly. JavaScript's safe
+    integer range covers about ₹90 trillion in paise, which is six orders of magnitude more than any
+    SME needs — so integers cost me nothing and remove a whole class of bug."</div>
+</section>
+
+<section id="s3">
+  <h2><span class="num">03</span> Architecture <span class="time">60s</span></h2>
+  <div class="say"><b>Say</b>
+    "It's a pnpm monorepo: <code>apps/api</code>, <code>apps/web</code>, and <code>packages/shared</code>
+    which holds the Zod schemas so the client and server validate against the exact same definitions —
+    they can't drift."</div>
+  <p><b>One codebase, three processes</b>, selected by <code>PROCESS_TYPE</code>:</p>
+  <ul>
+    <li><code>api</code> — the HTTP server</li>
+    <li><code>worker</code> — BullMQ consumers, scheduled jobs, the outbox publisher</li>
+    <li><code>ws</code> — realtime (reserved)</li>
+  </ul>
+  <div class="say"><b>Say</b>
+    "They're separate processes on purpose. The API must never consume a queue — a slow report export
+    would otherwise block someone trying to raise an invoice."</div>
+  <div class="show"><b>Show</b> <code>apps/api/src/index.ts</code> — the <code>switch (env.PROCESS_TYPE)</code>.</div>
+</section>
+
+<section id="s4">
+  <h2><span class="num">04</span> The server refuses to boot <span class="time">45s</span></h2>
+  <p class="goal">A small section that always impresses, because most student projects crash at runtime instead.</p>
+  <div class="say"><b>Say</b>
+    "Two things are checked before the server will serve a single request. First, every environment
+    variable is parsed through Zod — a missing JWT secret throws at boot with a readable message,
+    because a server that starts without one is worse than a server that won't start."</div>
+  <div class="say"><b>Say</b>
+    "Second, MongoDB must be a replica set. I check <code>hello.setName</code> at connect time and
+    disconnect if it's missing. A standalone MongoDB can't open a session, so every ledger transaction
+    would fail at runtime — I'd rather fail at boot with an explanation."</div>
+  <div class="show"><b>Show</b> <code>config/env.ts</code> and <code>config/db.ts</code>, then the boot log:
+    <pre><code>mongo connected (replica set OK)  replicaSet: atlas-…-shard-0
+api listening  port: 4100</code></pre></div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">05</span> Organization → Company → User <span class="time">2 min</span></h2>
+  <p class="goal">The most likely thing you'll be questioned on. Draw it on the board.</p>
+  <pre><code>Organization  (plan, limits.maxCompanies: 10)
+   ├── Company A ──┐
+   ├── Company B ──┼── Membership(user, company, role) ──> User
+   └── Company C ──┘      status: invited | active | suspended</code></pre>
+  <table>
+    <tr><th>Entity</th><th>What it is</th></tr>
+    <tr><td><b>Organization</b></td><td>The billing and quota boundary — plan, limits, owner. Subscriptions hang off this, never off a company.</td></tr>
+    <tr><td><b>Company</b></td><td>The books boundary — GSTIN, state code, financial year. Every ledger row belongs to one.</td></tr>
+    <tr><td><b>User</b></td><td>Pure identity — email, password hash, 2FA. Belongs to <i>no</i> company directly.</td></tr>
+    <tr><td><b>Membership</b></td><td>The only thing that joins them: user + company + role.</td></tr>
+    <tr><td><b>Role</b></td><td>Org-scoped, carries the permission array that gates every endpoint.</td></tr>
+  </table>
+  <div class="say"><b>The line to land</b>
+    "A user joins a <i>company</i>, not an organization — and gets a different role in each. That's why
+    one person can be the owner of their own business and an accountant in a client's books at the same
+    time. That's the CA-firm case, and it's why Membership is a separate collection instead of a
+    <code>companyId</code> field on the user."</div>
+  <p><b>Two ways to get a second company</b> — know both:</p>
+  <ul>
+    <li><b>Create:</b> <code>POST /companies</code> → finds or creates your org → checks
+      <code>maxCompanies</code> → creates the company → creates <i>your</i> owner Membership →
+      <b>seeds the chart of accounts</b>. That last step isn't optional: a company with no accounts
+      can't take a bank account, an invoice or a bill.</li>
+    <li><b>Join:</b> invite by email → <code>Membership{status:'invited'}</code> + a 7-day signed token →
+      the invitee must <b>log in as that email</b> to accept. A forwarded link grants nothing.</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <h2><span class="num">06</span> Tenant isolation <span class="time">75s</span></h2>
+  <div class="say"><b>Say</b>
+    "Multi-tenancy is where this kind of app leaks data. I refused to enforce it in the controllers,
+    because enforcement that depends on every developer remembering a <code>where</code> clause fails
+    the first time someone forgets."</div>
+  <p>How a request is scoped, in order:</p>
+  <ol>
+    <li>Client sends <code>X-Company-Id</code> on every request.</li>
+    <li><code>tenantResolve</code> looks for an <b>active</b> Membership for that user and company — no membership, no access.</li>
+    <li>The resolved <code>companyId</code> goes into <code>AsyncLocalStorage</code>.</li>
+    <li>A Mongoose plugin injects it into every <code>find</code>, <code>updateOne</code> and <code>aggregate</code>.</li>
+    <li><b>A query with no resolved companyId throws.</b></li>
+  </ol>
+  <div class="say"><b>The line to land</b>
+    "So there is no code path where forgetting a filter leaks another tenant's data — the query layer
+    won't run without a tenant. And <code>companyId</code> is the first field of every compound index,
+    so isolation is also what makes it fast."</div>
+</section>
+
+<section id="s7">
+  <h2><span class="num">07</span> Authentication &amp; security <span class="time">60s</span></h2>
+  <ul>
+    <li><b>argon2id</b> for passwords, at the OWASP-recommended memory cost — not bcrypt, not SHA.</li>
+    <li><b>Short-lived access token + refresh token.</b> Tokens never touch <code>localStorage</code>.</li>
+    <li><b>TOTP 2FA</b>, with the secret encrypted at rest with AES-256-GCM.</li>
+    <li><b>Rate limiting</b> in three tiers, with a deliberate asymmetry.</li>
+  </ul>
+  <div class="say"><b>The line to land (this one is a real design decision)</b>
+    "The general limiter <i>fails open</i> — if Redis dies, people keep working. But the login limiter
+    <i>fails closed</i> — if Redis dies, logins are refused. Unlimited credential stuffing is worse
+    than an outage. Same component, opposite failure mode, chosen per risk."</div>
+</section>
+
+<section id="s8">
+  <h2><span class="num">08</span> The ledger — the core <span class="time">2 min</span></h2>
+  <div class="say"><b>Say</b>
+    "Everything financial ends up as a balanced journal entry. An invoice isn't stored as a total —
+    it's stored as a document that <i>causes</i> a posting."</div>
+  <p>Issuing a ₹1,000 invoice at 18% GST posts, in one transaction:</p>
+  <pre><code>Dr  Accounts Receivable      118000 paise
+    Cr  Sales Revenue                100000 paise
+    Cr  Output CGST                    9000 paise
+    Cr  Output SGST                    9000 paise</code></pre>
+  <div class="say"><b>Say</b>
+    "Debits equal credits or the transaction aborts. And because this is a replica set, the invoice,
+    the journal entry and the document number are committed atomically — you can never end up with an
+    invoice that has no posting."</div>
+  <div class="ask"><b>If asked "why MongoDB for accounting? Isn't SQL better here?"</b>
+    Be honest and specific: "A relational database would also be a reasonable choice. What accounting
+    needs is transactions, and MongoDB gives me those on a replica set — which is exactly why the
+    replica set is mandatory rather than optional in my setup. What I gain is that an invoice with its
+    line items is one document, so reading one is one query instead of a join."</div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">09</span> Gapless numbering &amp; idempotency <span class="time">75s</span></h2>
+  <div class="say"><b>Say</b>
+    "GST law requires invoice numbers to be gapless and sequential per company, per financial year.
+    So I never count documents and add one — that races under load. Numbers come from an atomic
+    <code>findOneAndUpdate</code> with <code>$inc</code> on a counters document, <b>inside the same
+    transaction that creates the invoice</b>. If the transaction aborts, the number is never consumed."</div>
+  <div class="say"><b>Say</b>
+    "And every mutating endpoint takes an <code>Idempotency-Key</code>. If the user's network drops
+    and the app retries, the stored response is replayed instead of raising a second invoice. The same
+    key with a <i>different</i> body is rejected outright — that's a bug on the client, not a retry."</div>
+  <div class="ask"><b>If asked "what if two users invoice at the same instant?"</b>
+    They serialize on the counter document. One gets 00021, the other 00022. Neither gets a duplicate,
+    and no number is skipped.</div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span> Sales flow <span class="time">90s · demo</span></h2>
+  <p class="goal">Switch to the browser here. Talk while clicking.</p>
+  <ol>
+    <li><b>Parties</b> — create a customer with GSTIN and state.</li>
+    <li><b>Invoice draft</b> — add lines; the <b>server</b> computes every total.</li>
+    <li><b>Issue</b> — assigns the gapless number and posts the journal entry.</li>
+    <li><b>Payment</b> — allocates against the invoice, posts another entry.</li>
+  </ol>
+  <div class="say"><b>The line to land</b>
+    "The client may propose quantity, rate and discount. It may never propose a total. If the browser
+    sends <code>totalPaise</code>, the server discards it silently and recomputes. Otherwise anyone with
+    dev-tools could invoice ₹1,00,000 and book ₹1."</div>
+  <div class="say"><b>On GST</b>
+    "Intra-state splits into CGST + SGST; inter-state is IGST. That's decided by comparing the
+    company's state code with the place of supply — which is why state is a validated dropdown and
+    not a free-text box."</div>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span> Purchases <span class="time">45s</span></h2>
+  <p>Bills (supplier invoices) and expenses. Same discipline, mirrored: a bill credits Accounts Payable
+     and debits the expense account plus input GST.</p>
+  <div class="say"><b>Say</b>
+    "Input GST matters because it becomes input tax credit — what you can set off against the GST you
+    collected. That's the link to the IMS section coming up."</div>
+</section>
+
+<section id="s12">
+  <h2><span class="num">12</span> Banking &amp; reconciliation <span class="time">60s</span></h2>
+  <ul>
+    <li>Register bank accounts, each mapped to a ledger account in the chart of accounts.</li>
+    <li>Import a statement as CSV with column mapping.</li>
+    <li>Each line gets a <b>fingerprint</b> so re-importing the same statement doesn't double-count.</li>
+    <li>Match statement lines against payments; status moves <code>unreconciled → reconciled</code>.</li>
+  </ul>
+  <div class="say"><b>The line to land</b>
+    "The fingerprint is the interesting bit. People re-upload the same statement constantly. Without a
+    deterministic fingerprint per line you silently double your bank balance."</div>
+</section>
+
+<section id="s13">
+  <h2><span class="num">13</span> GST &amp; IMS <span class="time">90s</span></h2>
+  <p><b>GST returns</b> <span class="pill ok">working</span> — GSTR-1 (outward supplies) and GSTR-3B
+     (summary) are generated <i>from the ledger</i>, not from a separate tally, with a trace back to the
+     journal entries that produced each figure.</p>
+  <div class="say"><b>Say</b>
+    "Generating the return from the ledger is the whole point. If the return and the books can disagree,
+    one of them is lying — and you won't find out until a notice arrives."</div>
+  <p><b>IMS — Invoice Management System</b>: the GSTN inbox of invoices your <i>suppliers</i> filed
+     against your GSTIN. You accept, reject, or keep them pending; that decides your input tax credit.
+     FinPilot matches each against your own bills and flags
+     <code>matched</code> / <code>amount_mismatch</code> / <code>not_in_books</code>.</p>
+  <div class="ask"><b>Say this before you're asked</b>
+    "The full IMS loop is implemented — sync, match, action, deadline alarm for credit at risk. It's
+    currently wired to a mock GSP client that returns an empty list, because a real GSP connection
+    needs a commercial licence. Swapping in a real client is one file; the interface is already
+    defined."</div>
+</section>
+
+<section id="s14">
+  <h2><span class="num">14</span> Reports <span class="time">60s</span></h2>
+  <p>Trial balance, Profit &amp; Loss, Balance sheet, Cash flow, Aged receivables, Aged payables —
+     all computed from the ledger, all as-of a date.</p>
+  <div class="say"><b>Say</b>
+    "Trial balance is the honesty check: total debits must equal total credits across every account.
+    If that ever doesn't hold, something bypassed the ledger — so I run it as a nightly reconciliation
+    job, not just as a screen."</div>
+  <div class="say"><b>On CSV export</b>
+    "Export doesn't run inline. It creates a job, returns a job id, and a worker produces the file —
+    because a large export shouldn't hold an HTTP connection open or block the API process."</div>
+</section>
+
+<section id="s15">
+  <h2><span class="num">15</span> AI Copilot <span class="time">2 min</span></h2>
+  <p class="goal">The part they'll be most curious about — and where you can show the most judgement.</p>
+  <div class="say"><b>Say</b>
+    "The Copilot is a tool-calling agent over Gemini. It has read tools for revenue, P&amp;L, trial
+    balance, balance sheet, cash position, invoices, bills, journal entries, bank transactions,
+    parties, GST returns and the company profile. Every tool runs through the tenant plugin, so a tool
+    is physically incapable of reading another company's data — even if the model asked it to."</div>
+  <p>Then the two rules that matter:</p>
+  <table>
+    <tr><th>Rule</th><th>Why</th></tr>
+    <tr><td><b>I9 — never state a number it didn't retrieve</b></td>
+        <td>Every figure in a reply is validated against the tool results from that same turn. If a
+            number appears that isn't in a tool result, the answer is rejected and retried — then falls
+            back to showing the raw data.</td></tr>
+    <tr><td><b>I10 — the AI proposes, a human confirms</b></td>
+        <td>Write tools return a <i>proposal</i>. The AI can draft an invoice; it can never issue one.</td></tr>
+  </table>
+  <div class="say"><b>The line to land</b>
+    "An accounting assistant that hallucinates a number is worse than no assistant, because it's
+    confident and wrong. So I made grounding a validation step, not a prompt instruction — prompts are
+    requests, validation is a guarantee."</div>
+  <div class="ask"><b>If asked "what stops prompt injection?"</b>
+    Two things. The system prompt declares tool results to be data, never instructions. And more
+    importantly, <code>executeTool</code> <b>overwrites</b> any <code>companyId</code> the model
+    supplies with the server's own. Even a perfectly injected prompt cannot reach another tenant.</div>
+</section>
+
+<section id="s16">
+  <h2><span class="num">16</span> Admin console <span class="time">75s</span></h2>
+  <div class="say"><b>Say</b>
+    "There's one super admin for the whole platform. It's a single boolean with no tiers, and it can't
+    be granted through any API — only by a script run on the server. The admin holds no company
+    membership at all, so it has no tenant footprint."</div>
+  <p>What it can do, and the controls on each:</p>
+  <ul>
+    <li><b>Sections</b> — switch features off per company (Sales, GST, Copilot…). Enforced by the API
+      returning <code>403</code>, not by hiding a menu item. Chart of accounts and journal can never be
+      switched off.</li>
+    <li><b>Impersonation</b> — enter a customer's account to reproduce a bug. Requires a written reason,
+      lasts 15 minutes, shows a permanent banner, and every request is tagged in the audit trail.</li>
+    <li><b>Dead-letter queue</b> — inspect and replay failed background jobs.</li>
+  </ul>
+  <div class="say"><b>The line to land</b>
+    "Support needs to see what the customer sees. The honest way to build that is a logged, time-boxed,
+    reason-required session — not a backdoor and not asking people for their password."</div>
+</section>
+
+<section id="s17">
+  <h2><span class="num">17</span> Reliability &amp; operations <span class="time">45s</span></h2>
+  <ul>
+    <li><b>Health endpoint</b> reporting per-component status, so a degraded dependency is visible
+        rather than guessed at.</li>
+    <li><b>Transactional outbox</b> — side effects are written in the same transaction as the data and
+        published by a change stream, with a reaper as the fallback if the resume token is lost.</li>
+    <li><b>Prometheus metrics</b>, structured logging, optional Sentry.</li>
+    <li><b>Dead-letter queue</b> so a failed job is inspectable and replayable, never silently lost.</li>
+  </ul>
+  <div class="say"><b>Say</b>
+    "The health check reports <code>degraded</code>, not just up or down. Right now Mongo is connected
+    and Redis isn't reachable from my laptop — and the app keeps working, because the limiters fall
+    back to an in-memory store. Partial failure is a state worth naming."</div>
+</section>
+
+<section id="s18">
+  <h2><span class="num">18</span> What is not finished <span class="time">45s</span></h2>
+  <p class="goal">Volunteer this. Examiners find gaps anyway — naming them first reads as command of the project.</p>
+  <table>
+    <tr><th>Area</th><th>State</th></tr>
+    <tr><td>IMS supplier feed</td><td><span class="pill gap">mock</span> Full loop built; GSP client returns an empty list — a real connection needs a commercial licence.</td></tr>
+    <tr><td>AI write proposals</td><td><span class="pill gap">partial</span> The AI drafts a proposal, but the confirm/reject inbox isn't persisted yet. The safety rule holds — nothing is ever written without a human — but the confirm step is unfinished.</td></tr>
+    <tr><td>CSV export</td><td><span class="pill gap">needs worker</span> Queued correctly; needs Redis and the worker process running to produce the file.</td></tr>
+    <tr><td>Realtime (<code>ws</code>)</td><td><span class="pill gap">reserved</span> Process type exists; not built.</td></tr>
+  </table>
+  <div class="say"><b>How to say it</b>
+    "These are the three things I'd finish next, in this order. None of them are rules being broken —
+    they're surfaces not yet connected."</div>
+</section>
+
+<section id="s19">
+  <h2><span class="num">19</span> Live demo — the click-path <span class="time">4 min</span></h2>
+  <p class="goal">Rehearse this exact order. Don't explore live.</p>
+  <ol>
+    <li><b>Log in.</b> Point out the token is held in memory, not <code>localStorage</code>.</li>
+    <li><b>Switch company.</b> Show the switcher listing several companies with your role in each —
+        this is the multi-tenancy story in one click.</li>
+    <li><b>Dashboard.</b> Numbers come from the ledger, not a cache.</li>
+    <li><b>Raise an invoice.</b> Customer → line → issue. Point at the generated number.</li>
+    <li><b>Open the journal.</b> Show the entry that invoice just posted, and that debits equal credits.
+        <b>This is the moment that proves it's real accounting.</b></li>
+    <li><b>Trial balance.</b> Totals match.</li>
+    <li><b>Copilot.</b> Ask "what is my revenue" — it calls the tool and answers with the retrieved
+        figure. Then ask about invoices.</li>
+    <li><b>Admin console.</b> Platform-wide view, Sections, and the audit trail.</li>
+  </ol>
+  <div class="ask"><b>Safety net</b>
+    Have the journal entry screen open in a second tab before you start. If the network misbehaves
+    during the demo, that screen alone carries the argument.</div>
+</section>
+
+<section id="s20">
+  <h2><span class="num">20</span> Questions you should expect <span class="time">prep</span></h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>"Why integers for money?"</td>
+        <td>Floats can't represent 0.1 exactly; errors compound over thousands of rows. Integer paise is exact, and the safe range covers ~₹90 trillion.</td></tr>
+    <tr><td>"Why must MongoDB be a replica set?"</td>
+        <td>Transactions and change streams need one. A standalone can't start a session, so every ledger posting would fail — so I check it at boot and refuse to serve.</td></tr>
+    <tr><td>"How do you stop one tenant reading another's data?"</td>
+        <td>Not in controllers. A Mongoose plugin injects <code>companyId</code> from <code>AsyncLocalStorage</code> into every query, and a query without one throws.</td></tr>
+    <tr><td>"What if the AI gets a number wrong?"</td>
+        <td>It's validated, not trusted. Figures are checked against that turn's tool results; a failure retries, then falls back to raw data.</td></tr>
+    <tr><td>"Can the AI change my books?"</td>
+        <td>No. Write tools return proposals. Nothing is posted without a human confirming.</td></tr>
+    <tr><td>"How do you correct a posted entry?"</td>
+        <td>You don't edit it — postings are append-only. You post a reversing entry that references the original, which is what an audit trail requires.</td></tr>
+    <tr><td>"What happens if Redis goes down?"</td>
+        <td>General limits fail open so work continues; login limits fail closed so credentials can't be brute-forced. Background jobs queue until it returns.</td></tr>
+    <tr><td>"Is it production-ready?"</td>
+        <td>Be straight: the accounting core is. The GSP integration and the AI confirm-inbox are not finished, and I'd want load testing before real customers.</td></tr>
+  </table>
+</section>
+
+</main>
+</div>
+</body>
+</html>

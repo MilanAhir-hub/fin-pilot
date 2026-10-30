@@ -5,7 +5,9 @@
  */
 import { getEnv } from '../config/env';
 import { logger } from '../config/logger';
+import { Company } from '../models/Company';
 import { Party } from '../models/Party';
+import { requestContext } from '../plugins/tenantScope';
 import { setLlmProvider, type LlmMessage, type LlmProvider, type LlmToolSpec, type LlmTurn } from './gateway';
 
 export function initLlmProvider(): void {
@@ -61,12 +63,43 @@ function createGeminiProvider(apiKey: string): LlmProvider {
         return fallbackSmartTurn(userMsg, messages, tools);
       }
 
-      // Query customers for invoice drafting context
+      /**
+       * Whose books are these? Without this the model sees a bare list of
+       * company-like names under "Available Customers", is told nothing about
+       * the company in context, and concludes it must ask the user which one
+       * to report on — so "what is my revenue" came back as "which company's
+       * revenue?". The tenant plugin already pins every tool to this company
+       * (I8); the model just had no way to know that.
+       */
+      let companyContext = '';
+      try {
+        const ctx = requestContext.getStore();
+        if (ctx?.companyId) {
+          const company = await Company.findById(ctx.companyId)
+            .select('legalName tradeName gstin stateCode')
+            .lean();
+          if (company) {
+            companyContext =
+              `You are working on the books of ${company.tradeName || company.legalName}` +
+              (company.gstin ? ` (GSTIN ${company.gstin})` : '') +
+              `. Every tool you call already reports on THIS company only — never ask the user ` +
+              `which company or which customer to report on, and never treat this company as a customer.`;
+          }
+        }
+      } catch {
+        // tenant context may not be present in stub/unit tests
+      }
+
+      // Customers are counterparties for invoice drafting — NOT a set of
+      // companies to choose between when answering a reporting question.
       let customerContext = '';
       try {
         const customers = await Party.find({ type: 'customer', deletedAt: null }).select('_id name').lean();
         if (customers.length > 0) {
-          customerContext = `Available Customers:\n${customers.map((c) => `- ${c.name} (partyId: "${c._id}")`).join('\n')}`;
+          customerContext =
+            `Customers (counterparties you invoice — use ONLY when drafting an invoice, ` +
+            `never to disambiguate a reporting question):\n` +
+            customers.map((c) => `- ${c.name} (partyId: "${c._id}")`).join('\n');
         }
       } catch {
         // tenant context may not be present in stub/unit tests
@@ -92,6 +125,7 @@ Return JSON with format:
       } else {
         prompt = `
 You are FinPilot, a helpful personal AI assistant and financial copilot for Indian SMEs.
+${companyContext}
 User message: "${userMsg}"
 
 Available tools:

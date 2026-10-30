@@ -33,6 +33,30 @@ export function getCompanyId(): string | null {
 export function setCompanyId(id: string | null): void {
   companyId = id;
 }
+
+/** Where a signed-in session is persisted across a reload. */
+export const SESSION_USER_KEY = 'fp-session-user';
+export const SESSION_COMPANY_KEY = 'fp-company-id';
+
+/**
+ * Drop every trace of the signed-in session — in memory and in storage.
+ *
+ * Both front doors sign out, and the admin portal used to clear only its own
+ * state: the cached user survived in sessionStorage, so signing out of the
+ * console landed on #login with the operator banner still painted and a 401
+ * underneath it. One function, called by both, is the only way these stay in
+ * step.
+ */
+export function clearStoredSession(): void {
+  setAccessToken(null);
+  setCompanyId(null);
+  try {
+    sessionStorage.removeItem(SESSION_USER_KEY);
+    localStorage.removeItem(SESSION_COMPANY_KEY);
+  } catch {
+    /* private mode — nothing to clear */
+  }
+}
 export function getImpersonation(): { sessionId: string; by: string } | null {
   return impersonation;
 }
@@ -94,7 +118,7 @@ function unreachable(cause: unknown): RequestError {
   return new RequestError(0, {
     code: 'NETWORK_UNREACHABLE',
     message:
-      'Cannot reach the FinPilot API. Check that the server on port 4000 is running, then retry.',
+      'Cannot reach the FinPilot API. Check that the API server is running, then retry.',
     details: cause instanceof Error ? cause.message : undefined,
   });
 }
@@ -205,7 +229,7 @@ export async function api<T>(
   if (!res.ok) {
     const defaultMsg =
       res.status === 500
-        ? 'Internal Server Error — backend server (port 4000) may be unreachable or down'
+        ? 'Internal Server Error — the API server may be unreachable or down'
         : res.status === 502 || res.status === 504
           ? `Server Gateway Error (${res.status}) — backend service temporarily unavailable or timed out`
           : res.status === 413

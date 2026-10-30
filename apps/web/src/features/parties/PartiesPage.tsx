@@ -1,7 +1,21 @@
 /** Customers & vendors with outstandings, plus the item master (§32 Phase 6). */
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { Badge, Btn, C, Card, Dropdown, Err, Field, Money, Row, S, Tbl, useLoad } from '../../lib/ui';
+import {
+  Badge,
+  Btn,
+  C,
+  Card,
+  Dropdown,
+  Err,
+  Field,
+  Money,
+  Row,
+  S,
+  StateCodeInput,
+  Tbl,
+  useLoad,
+} from '../../lib/ui';
 
 interface Party {
   id: string;
@@ -71,13 +85,8 @@ function PartyForm({ onDone }: { onDone: () => void }) {
             ]}
           />
         </Field>
-        <Field label="State code">
-          <input
-            style={{ ...S.input, width: 90 }}
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            required
-          />
+        <Field label="State">
+          <StateCodeInput value={state} onChange={setState} width={240} required />
         </Field>
         <Field label="GSTIN (optional — checksum-validated)">
           <input

@@ -14,6 +14,7 @@ import { validate } from '../../middleware/validate';
 import { adminService } from '../../services/admin/adminService';
 import { subscriptionService } from '../../services/admin/subscriptionService';
 import { dlqService } from '../../services/dlqService';
+import { AppError } from '../../utils/AppError';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ok } from '../../utils/respond';
 
@@ -35,26 +36,25 @@ adminRoutes.get(
   }),
 );
 
+/**
+ * FinPilot runs on exactly ONE super admin, and that is enforced here rather
+ * than by having removed the button.
+ *
+ * `superAdmin` is a single boolean with no tiers (requireSuperAdmin is the
+ * only gate), so every operator account is a full-powered one — a second one
+ * is not a lesser admin, it is another key to everything, and an unused key
+ * is the dangerous kind because it has no activity to notice. Minting one is
+ * therefore a deliberate act at the server, not an API call: `pnpm admin:grant
+ * <email> --password <...>`. That script is also the only safe path, since it
+ * refuses to promote a user who holds company memberships, and refuses to
+ * revoke the last remaining operator.
+ */
 adminRoutes.post(
   '/operators',
-  validate(
-    z.object({
-      email: z.string().trim().toLowerCase().email(),
-      name: z.string().trim().min(1).max(120),
-      password: z.string().min(12, 'an operator password must be at least 12 characters'),
-      reason: z.string().min(10),
-    }),
-  ),
-  asyncHandler(async (req: Request, res: Response) => {
-    ok(
-      res,
-      await adminService.createOperator(
-        new Types.ObjectId(req.user!.id),
-        { email: req.body.email, name: req.body.name, password: req.body.password },
-        req.body.reason,
-      ),
-      201,
-    );
+  asyncHandler(async (_req: Request, _res: Response) => {
+    throw new AppError('AUTH_FORBIDDEN', 403, {
+      reason: 'FinPilot allows a single super admin; create operators with `pnpm admin:grant`.',
+    });
   }),
 );
 

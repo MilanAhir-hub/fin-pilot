@@ -4,8 +4,15 @@
  * formatted ONLY here via formatINR (I1: display formatting happens once,
  * at the React boundary) and rendered in the mono numerals face.
  */
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { formatINR } from '@finpilot/shared';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import { GST_STATE_CODES, formatINR } from '@finpilot/shared';
 import { RequestError } from './api';
 import { useOptionalToast } from './toast';
 
@@ -482,3 +489,128 @@ export function useLoad<T>(
 }
 
 export { Dropdown, type DropdownOption, type DropdownProps } from '../components/Dropdown';
+
+/**
+ * GST state picker — type to search, click to choose.
+ *
+ * The field used to be a bare two-character text box labelled "State code
+ * (24 = Gujarat)", so entering anything but Gujarat meant knowing the GST
+ * numbering by heart; a wrong code is accepted by the input and only rejected
+ * later by the Zod refine, and the code decides intra vs inter-state GST.
+ * This searches on both name and code ("guj", "24", "mah" all work) and can
+ * only ever emit a code that exists in GST_STATE_CODES.
+ */
+export function StateCodeInput({
+  value,
+  onChange,
+  width = 260,
+  required,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+  width?: number | string;
+  required?: boolean;
+}) {
+  const ENTRIES = Object.entries(GST_STATE_CODES);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const box = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? ENTRIES.filter(([code, name]) => name.toLowerCase().includes(q) || code.includes(q))
+    : ENTRIES;
+
+  // Closed, the field shows the chosen state; open, it shows what you typed.
+  const label = value && GST_STATE_CODES[value] ? `${value} — ${GST_STATE_CODES[value]}` : '';
+
+  function choose(code: string) {
+    onChange(code);
+    setQuery('');
+    setOpen(false);
+  }
+
+  return (
+    <div ref={box} style={{ position: 'relative', width }}>
+      <input
+        className="fp-input"
+        style={{ ...S.input, width: '100%' }}
+        value={open ? query : label}
+        placeholder="Search state or code…"
+        required={required && !value}
+        onFocus={() => {
+          setQuery('');
+          setOpen(true);
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          const first = matches[0];
+          if (e.key === 'Enter' && open && first) {
+            e.preventDefault();
+            choose(first[0]);
+          }
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      />
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 40,
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            maxHeight: 260,
+            overflowY: 'auto',
+            borderRadius: 8,
+            border: `1px solid ${C.border}`,
+            background: C.panel,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+          }}
+        >
+          {matches.length === 0 && (
+            <div style={{ padding: '0.6rem 0.7rem', color: C.muted, fontSize: '0.82rem' }}>
+              No state matches “{query}”.
+            </div>
+          )}
+          {matches.map(([code, name]) => (
+            <button
+              key={code}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(code)}
+              style={{
+                display: 'flex',
+                gap: 10,
+                width: '100%',
+                textAlign: 'left',
+                cursor: 'pointer',
+                padding: '0.45rem 0.7rem',
+                fontSize: '0.85rem',
+                border: 'none',
+                background: code === value ? C.accentSoft : 'transparent',
+                color: code === value ? C.text : C.muted,
+              }}
+            >
+              <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: C.text }}>
+                {code}
+              </span>
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

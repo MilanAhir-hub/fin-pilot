@@ -7,7 +7,7 @@
  * Impersonation REQUIRES a reason; the loud banner is driven by the
  * X-Impersonation-* response headers in lib/api.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, qs, setAccessToken } from "../../lib/api";
 import { Badge, Btn, C, Card, Err, Field, Row, S, Tbl, dateStr, useLoad } from "../../lib/ui";
 
@@ -299,7 +299,13 @@ function activityDot(type: string) {
 }
 
 export function AdminPage({ onImpersonated }: { onImpersonated: () => void }) {
+  // One destination at a time. The rail selects the page; the page owns the
+  // viewport. Scroll position resets on every change so a long table does not
+  // hand the next section a scrolled-down viewport.
   const [tab, setTab] = useState<Tab>("overview");
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [tab]);
   const [error, setError] = useState<unknown>(null);
 
   const overview = useLoad(() => api<Overview>("GET", "/api/v1/admin/overview"));
@@ -353,6 +359,37 @@ export function AdminPage({ onImpersonated }: { onImpersonated: () => void }) {
     }
   }
 
+  /**
+   * One-click impersonation straight from a user row. The form below still
+   * exists for a user you only have an id for, but copying a 24-char ObjectId
+   * out of the Users table to paste it back in two fields down was the only
+   * way to reach an account — and a mistyped id is a 404, not a wrong account.
+   * The reason is still mandatory and still audited verbatim (§17).
+   */
+  async function accessAccount(user: UserRow) {
+    const why = window.prompt(
+      `Access ${user.email} as them.\n\nThis opens a 15-minute impersonated session. Every request is logged against your operator account.\n\nReason (min 10 chars, audited verbatim):`,
+      "",
+    );
+    if (why === null) return;
+    if (why.trim().length < 10) {
+      setError(new Error("A reason of at least 10 characters is required to impersonate."));
+      return;
+    }
+    setError(null);
+    try {
+      const result = await api<{ token: string; sessionId: string }>(
+        "POST",
+        "/api/v1/admin/impersonate",
+        { targetUserId: user.id, reason: why.trim() },
+      );
+      setAccessToken(result.token);
+      onImpersonated();
+    } catch (err) {
+      setError(err);
+    }
+  }
+
   async function setUserDisabled(user: UserRow) {
     const why = window.prompt(
       `${user.disabled ? "Re-enable" : "Disable"} ${user.email}. Reason (min 10 chars, audited):`,
@@ -390,29 +427,69 @@ export function AdminPage({ onImpersonated }: { onImpersonated: () => void }) {
   });
 
   return (
-    <div>
-      <Card
-        title="Platform console"
-        actions={
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {TABS.map((t) => (
-              <Btn
-                key={t.key}
-                small
-                kind={tab === t.key ? "primary" : "ghost"}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-              </Btn>
-            ))}
-          </div>
-        }
+    // Sidebar on the left, the active section on the right. The old layout put
+    // nine tabs in a wrapping row above the content, so the section you were
+    // reading shifted down as the row rewrapped and nothing was ever fully
+    // visible at once. A fixed rail keeps every destination on screen.
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+      <aside
+        style={{
+          flex: "0 0 208px",
+          position: "sticky",
+          top: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          padding: 10,
+          borderRadius: 10,
+          border: `1px solid ${C.border}`,
+          background: C.panel,
+        }}
       >
-        <p style={{ color: C.muted, fontSize: "0.82rem", margin: 0 }}>
-          Every company and every organization on the platform, above the tenant boundary. Changes
-          that affect a customer require a written reason and appear in the audit trail.
-        </p>
-      </Card>
+        <div
+          style={{
+            color: C.muted,
+            fontSize: "0.68rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            padding: "2px 8px 8px",
+          }}
+        >
+          Platform console
+        </div>
+        {TABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              style={{
+                textAlign: "left",
+                cursor: "pointer",
+                padding: "8px 10px",
+                borderRadius: 7,
+                fontSize: "0.85rem",
+                fontWeight: active ? 600 : 400,
+                color: active ? C.text : C.muted,
+                background: active ? C.accentSoft : "transparent",
+                border: "none",
+                borderLeft: `2px solid ${active ? C.accent : "transparent"}`,
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </aside>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Card title={TABS.find((t) => t.key === tab)?.label ?? "Platform console"}>
+          <p style={{ color: C.muted, fontSize: "0.82rem", margin: 0 }}>
+            Every company and every organization on the platform, above the tenant boundary. Changes
+            that affect a customer require a written reason and appear in the audit trail.
+          </p>
+        </Card>
 
       <Err error={error} />
 
@@ -526,14 +603,20 @@ export function AdminPage({ onImpersonated }: { onImpersonated: () => void }) {
                   ops-only
                 </span>
               ) : (
-                <Btn
-                  key="a"
-                  small
-                  kind={u.disabled ? "success" : "danger"}
-                  onClick={() => void setUserDisabled(u)}
-                >
-                  {u.disabled ? "Enable" : "Disable"}
-                </Btn>
+                <Row key="a">
+                  {/* An operator cannot impersonate a disabled user: the session
+                      would be revoked on the first request anyway. */}
+                  <Btn small kind="ghost" disabled={u.disabled} onClick={() => void accessAccount(u)}>
+                    Access account
+                  </Btn>
+                  <Btn
+                    small
+                    kind={u.disabled ? "success" : "danger"}
+                    onClick={() => void setUserDisabled(u)}
+                  >
+                    {u.disabled ? "Enable" : "Disable"}
+                  </Btn>
+                </Row>
               ),
             ])}
           />
@@ -833,6 +916,7 @@ export function AdminPage({ onImpersonated }: { onImpersonated: () => void }) {
           />
         </Card>
       )}
+      </div>
     </div>
   );
 }

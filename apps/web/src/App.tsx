@@ -13,7 +13,7 @@ import {
   setAccessToken,
   setCompanyId,
 } from './lib/api';
-import { Btn, C, Card, Err, Field, Row, S, ThemeToggle, useLoad } from './lib/ui';
+import { Btn, C, Card, Err, Field, Row, S, StateCodeInput, ThemeToggle, useLoad } from './lib/ui';
 import { AccountsTree, type AccountRow } from './features/accounts/AccountsTree';
 import { JournalPage } from './features/journal/JournalPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
@@ -62,6 +62,17 @@ interface PublicUser {
 interface CompanyRow {
   id: string;
   legalName: string;
+  /**
+   * companyDto spreads the whole document, so the switcher payload has carried
+   * these all along — they were simply not declared, which left SettingsPage
+   * unable to take the company it is handed (stateCode is required there, and
+   * it drives GST place-of-supply, so an undefined would not be cosmetic).
+   */
+  stateCode: string;
+  tradeName?: string;
+  gstin?: string;
+  pan?: string;
+  booksBeginDate?: string;
   role: { key: string; name: string };
   /** Sections a platform operator switched off. The API refuses them too. */
   disabledModules?: string[];
@@ -756,28 +767,11 @@ function AuthPage({
               >
                 {mode === 'login' ? 'New here? Create an account' : 'Already registered? Sign in'}
               </button>
-              <div style={{ textAlign: 'center', marginTop: 4 }}>
-                <a
-                  href="#admin"
-                  style={{
-                    color: 'var(--muted)',
-                    fontSize: '13px',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontWeight: 500,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--accent)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--muted)';
-                  }}
-                >
-                  <span>🛡️ Platform Operator / Admin Sign in →</span>
-                </a>
-              </div>
+              {/* No separate operator door. The credentials decide where you
+                  land: a superAdmin is redirected to #admin on sign-in, anyone
+                  else continues into their company. A visible "admin sign in"
+                  link only advertises the console to people who cannot use it —
+                  the guard was always server-side anyway. */}
             </div>
           </form>
         </div>
@@ -900,14 +894,8 @@ function CompanyPicker({
             />
           </Field>
           <Row>
-            <Field label="State code (24 = Gujarat)">
-              <input
-                className="fp-input"
-                style={{ ...S.input, width: 110 }}
-                value={stateCode}
-                onChange={(e) => setStateCode(e.target.value)}
-                required
-              />
+            <Field label="State">
+              <StateCodeInput value={stateCode} onChange={setStateCode} width={260} required />
             </Field>
             <Field label="GSTIN (optional)">
               <input
