@@ -14,7 +14,6 @@ process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
 
 import { setRazorpaySubscriptionClient } from '../../src/integrations/razorpay/subscriptions';
 import { AuditLog } from '../../src/models/AuditLog';
-import { ImpersonationSession } from '../../src/models/ImpersonationSession';
 import { Organization } from '../../src/models/Organization';
 import { Subscription } from '../../src/models/Subscription';
 import { User } from '../../src/models/User';
@@ -251,15 +250,7 @@ describe('super-admin console + impersonation (§32 Phase 23)', () => {
       .set(idem(token))
       .expect(201);
     expect(issueRes.headers['x-impersonation-session']).toBe(sessionId);
-
-    // 1) the session's action log has every request
-    const session = await ImpersonationSession.findById(sessionId).lean();
-    expect(session!.reason).toContain('GH-1042');
-    const paths = session!.actions.map((a) => `${a.method} ${a.path}`);
-    expect(paths).toContain('POST /api/v1/invoices');
-    expect(paths.some((p) => p.endsWith('/issue'))).toBe(true);
-
-    // 2) the ledger audit row carries impersonatedBy
+    // 1) the ledger audit row carries impersonatedBy
     const audit = await AuditLog.findOne({
       action: 'journal.posted',
       'meta.impersonatedBy': { $exists: true },

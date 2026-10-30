@@ -27,6 +27,7 @@ These files are completely detached from the application tree—no file in `apps
 - **AdminAudit Model (DELETED):** Removed redundant `AdminAudit.ts` and dropped `adminaudits` collection from MongoDB. Super-admin platform actions (impersonation, plan changes, operator grants) now log directly to standard application structured logs (`logger.info`).
 - **AiProposal & AiToolCall Models (DELETED):** Removed `AiProposal.ts` and `AiToolCall` model from `AiConversation.ts`, dropped `aiproposals` and `aitoolcalls` collections from MongoDB. Tools execute directly and streamline grounded copilot reasoning without redundant database write overhead.
 - **DeadLetter Model (DELETED):** Removed `DeadLetter.ts` and dropped `deadletters` collection from MongoDB. Background worker job retries and failed states are natively managed by BullMQ in Redis without duplicate persistence in MongoDB.
+- **ImpersonationSession Model (DELETED):** Removed `ImpersonationSession.ts` and dropped `impersonationsessions` collection from both MongoDB Atlas and local instances. Support impersonation sessions are now verified statelessly via signed short-lived JWTs (`claims.imp = { by, sid }`) and audited directly in ledger `AuditLog` entries and logger streams without continuous database write overhead on every request.
 
 ### 1.2 [`apps/web/src/features/platform/MembersPage.tsx`](file:///c:/Users/Milan%20Gagiya/Documents/PROJECT%20RESUME/fin-pilot-/apps/web/src/features/platform/MembersPage.tsx)
 

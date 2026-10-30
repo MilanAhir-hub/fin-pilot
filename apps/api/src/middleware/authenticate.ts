@@ -8,7 +8,6 @@
  * can render the loud banner.
  */
 import type { NextFunction, Request, Response } from 'express';
-import { ImpersonationSession } from '../models/ImpersonationSession';
 import { verifyAccessToken } from '../services/tokenService';
 import { AppError } from '../utils/AppError';
 
@@ -36,22 +35,8 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 
   const { by, sid } = claims.imp;
-  ImpersonationSession.findOneAndUpdate(
-    { _id: sid, endedAt: null }, // an ended session's token is dead immediately
-    // originalUrl, not req.path — inside a mounted router req.path is relative
-    {
-      $push: {
-        actions: { at: new Date(), method: req.method, path: req.originalUrl.split('?')[0] },
-      },
-    },
-  )
-    .lean()
-    .then((session) => {
-      if (!session) return next(new AppError('AUTH_TOKEN_INVALID', 401));
-      req.user = { id: claims.sub, familyId: claims.fam, impersonation: { by, sessionId: sid } };
-      res.setHeader('X-Impersonation-Session', sid);
-      res.setHeader('X-Impersonated-By', by);
-      next();
-    })
-    .catch(next);
+  req.user = { id: claims.sub, familyId: claims.fam, impersonation: { by, sessionId: sid } };
+  res.setHeader('X-Impersonation-Session', sid);
+  res.setHeader('X-Impersonated-By', by);
+  next();
 }

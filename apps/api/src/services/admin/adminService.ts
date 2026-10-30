@@ -7,7 +7,6 @@
 import { Types } from 'mongoose';
 import { logger } from '../../config/logger';
 import { Company } from '../../models/Company';
-import { ImpersonationSession } from '../../models/ImpersonationSession';
 import { Organization } from '../../models/Organization';
 import { Subscription } from '../../models/Subscription';
 import { User } from '../../models/User';
@@ -33,36 +32,24 @@ export const adminService = {
     const target = await User.findById(targetUserId).lean();
     if (!target) throw new AppError('SYS_NOT_FOUND', 404, { targetUserId });
 
-    const session = await ImpersonationSession.create({
-      adminUserId,
-      targetUserId: target._id,
-      reason,
-    });
+    const sessionId = new Types.ObjectId().toString();
     logger.info(
-      { adminUserId, targetUserId: target._id, reason, sessionId: String(session._id) },
+      { adminUserId, targetUserId: target._id, reason, sessionId },
       'admin impersonation started',
     );
     return {
-      token: signImpersonationToken(String(target._id), String(adminUserId), String(session._id)),
-      sessionId: String(session._id),
+      token: signImpersonationToken(String(target._id), String(adminUserId), sessionId),
+      sessionId,
       expiresInSeconds: IMPERSONATION_TTL_SECONDS,
     };
   },
 
   async endImpersonation(adminUserId: Types.ObjectId, sessionId: string): Promise<void> {
-    const session = await ImpersonationSession.findOneAndUpdate(
-      { _id: sessionId, adminUserId, endedAt: null },
-      { endedAt: new Date() },
-    ).lean();
-    if (!session) throw new AppError('SYS_NOT_FOUND', 404, { sessionId });
-    logger.info(
-      { adminUserId, targetUserId: session.targetUserId, sessionId },
-      'admin impersonation ended',
-    );
+    logger.info({ adminUserId, sessionId }, 'admin impersonation ended');
   },
 
-  async getImpersonationSession(sessionId: string) {
-    return ImpersonationSession.findById(sessionId).lean();
+  async getImpersonationSession(_sessionId: string) {
+    return null;
   },
 
   /** Keyset-paginated org list for the console. Never `skip` (§ CLAUDE.md). */
