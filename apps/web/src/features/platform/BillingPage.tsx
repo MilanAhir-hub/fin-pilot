@@ -71,6 +71,7 @@ export function BillingPage() {
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string>('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectedPlanKey, setSelectedPlanKey] = useState<string | null>(null);
 
   async function subscribe(planRow: PlanRow) {
     setError(null);
@@ -105,6 +106,7 @@ export function BillingPage() {
             setNotice(
               `🎉 Payment successful via Razorpay! Upgraded to ${planRow.key.toUpperCase()} plan. Payment ID: ${response.razorpay_payment_id || 'captured'}`
             );
+            setSelectedPlanKey(null);
             billing.reload();
             catalogue.reload();
           } catch (activateErr) {
@@ -145,6 +147,7 @@ export function BillingPage() {
       setNotice(
         `🎉 Successfully activated ${planRow.key.toUpperCase()} plan using permanent domestic test card (4100 2800 0000 1007). Payment ID: ${mockPaymentId}`
       );
+      setSelectedPlanKey(null);
       billing.reload();
       catalogue.reload();
     } catch (err) {
@@ -156,6 +159,8 @@ export function BillingPage() {
 
   const d = billing.data;
   const cat = catalogue.data;
+  const currentPlanFromBackend = cat?.currentPlan || d?.plan || 'starter';
+  const chosenPlanKey = selectedPlanKey || currentPlanFromBackend;
 
   return (
     <div>
@@ -294,80 +299,205 @@ export function BillingPage() {
             gap: 12,
           }}
         >
-          {(cat?.plans ?? []).map((p) => (
-            <div
-              key={p.key}
-              style={{
-                border: `1px solid ${p.current ? C.accent : C.border}`,
-                background: p.current ? C.panel2 : 'transparent',
-                borderRadius: 10,
-                padding: '0.9rem 1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 700, textTransform: 'capitalize', fontSize: '1.05rem' }}>
-                  {p.key}
-                </span>
-                {p.current && <Badge value="active" />}
-              </div>
+          {(cat?.plans ?? []).map((p) => {
+            const isChosen = p.key === chosenPlanKey;
+            const isCurrentActive = p.current;
 
-              <div>
-                <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                  {p.pricePaise === 0 ? 'Free' : formatINR(p.pricePaise)}
-                </span>
-                {p.pricePaise > 0 && (
-                  <span style={{ color: C.muted, fontSize: '0.8rem' }}> / month</span>
-                )}
-              </div>
-
-              <ul
+            return (
+              <div
+                key={p.key}
                 style={{
-                  margin: 0,
-                  paddingLeft: '1.1rem',
-                  color: C.muted,
-                  fontSize: '0.8rem',
-                  lineHeight: 1.7,
+                  border: isChosen ? `2px solid ${C.accent}` : `1px dashed ${C.border}`,
+                  background: isChosen ? C.panel2 : 'rgba(15, 23, 42, 0.35)',
+                  boxShadow: isChosen ? '0 0 24px rgba(16, 185, 129, 0.16)' : 'none',
+                  opacity: isChosen ? 1 : 0.45,
+                  filter: isChosen ? 'none' : 'grayscale(45%)',
+                  borderRadius: 10,
+                  padding: '0.9rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
                 }}
               >
-                <li>{plural(p.limits.maxCompanies, 'company', 'companies')}</li>
-                <li>{plural(p.limits.maxUsers, 'user', 'users')}</li>
-                <li>{plural(p.limits.maxInvoicesMonth, 'invoice', 'invoices')} / month</li>
-                <li>{plural(p.limits.ocrPagesMonth, 'OCR page', 'OCR pages')} / month</li>
-                <li>{n(p.limits.aiTokensMonth)} AI tokens / month</li>
-              </ul>
-
-              <div style={{ marginTop: 'auto' }}>
-                {p.current ? (
-                  <span style={{ color: C.muted, fontSize: '0.8rem' }}>Your current plan</span>
-                ) : p.key === 'free' ? (
-                  <span style={{ color: C.muted, fontSize: '0.8rem' }}>
-                    Downgrades are handled by support
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      textTransform: 'capitalize',
+                      fontSize: '1.05rem',
+                      color: isChosen ? C.text : C.muted,
+                    }}
+                  >
+                    {p.key}
                   </span>
-                ) : p.subscribable ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <Btn small onClick={() => void subscribe(p)} disabled={busy !== null}>
-                      {busy === p.key ? 'Opening Razorpay…' : `Subscribe with Razorpay`}
-                    </Btn>
-                    <Btn
-                      small
-                      kind="ghost"
-                      onClick={() => void directTestSubscribe(p)}
-                      disabled={busy !== null}
-                    >
-                      ⚡ Instant Test Card Subscribe
-                    </Btn>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {isChosen ? (
+                      <span
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.2)',
+                          color: '#10b981',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        ✓ CHOSEN PLAN
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          color: C.muted,
+                          border: `1px solid ${C.border}`,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Disabled
+                      </span>
+                    )}
+                    {isCurrentActive && <Badge value="active" />}
                   </div>
-                ) : (
-                  <span style={{ color: C.amber, fontSize: '0.78rem' }}>
-                    {p.configured ? 'Razorpay keys missing' : 'No Razorpay plan id configured'}
+                </div>
+
+                <div>
+                  <span
+                    style={{
+                      fontSize: '1.5rem',
+                      fontWeight: 700,
+                      color: isChosen ? C.text : C.muted,
+                    }}
+                  >
+                    {p.pricePaise === 0 ? 'Free' : formatINR(p.pricePaise)}
                   </span>
-                )}
+                  {p.pricePaise > 0 && (
+                    <span style={{ color: C.muted, fontSize: '0.8rem' }}> / month</span>
+                  )}
+                </div>
+
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: '1.1rem',
+                    color: C.muted,
+                    fontSize: '0.8rem',
+                    lineHeight: 1.7,
+                    opacity: isChosen ? 1 : 0.75,
+                  }}
+                >
+                  <li>{plural(p.limits.maxCompanies, 'company', 'companies')}</li>
+                  <li>{plural(p.limits.maxUsers, 'user', 'users')}</li>
+                  <li>{plural(p.limits.maxInvoicesMonth, 'invoice', 'invoices')} / month</li>
+                  <li>{plural(p.limits.ocrPagesMonth, 'OCR page', 'OCR pages')} / month</li>
+                  <li>{n(p.limits.aiTokensMonth)} AI tokens / month</li>
+                </ul>
+
+                <div style={{ marginTop: 'auto' }}>
+                  {isChosen ? (
+                    isCurrentActive ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div
+                          style={{
+                            color: C.green,
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span>✓</span>
+                          <span>Your current active plan</span>
+                        </div>
+                        <span style={{ color: C.muted, fontSize: '0.75rem' }}>
+                          Other plans are disabled.
+                        </span>
+                      </div>
+                    ) : p.key === 'free' ? (
+                      <span style={{ color: C.muted, fontSize: '0.8rem' }}>
+                        Downgrades are handled by support
+                      </span>
+                    ) : p.subscribable ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ fontSize: '0.75rem', color: C.accent, fontWeight: 600 }}>
+                          ✓ Plan chosen — activate below:
+                        </div>
+                        <Btn small onClick={() => void subscribe(p)} disabled={busy !== null}>
+                          {busy === p.key ? 'Opening Razorpay…' : `Subscribe with Razorpay`}
+                        </Btn>
+                        <Btn
+                          small
+                          kind="ghost"
+                          onClick={() => void directTestSubscribe(p)}
+                          disabled={busy !== null}
+                        >
+                          ⚡ Instant Test Card Subscribe
+                        </Btn>
+                      </div>
+                    ) : (
+                      <span style={{ color: C.amber, fontSize: '0.78rem' }}>
+                        {p.configured ? 'Razorpay keys missing' : 'No Razorpay plan id configured'}
+                      </span>
+                    )
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <Btn
+                        small
+                        disabled
+                        style={{
+                          opacity: 0.45,
+                          cursor: 'not-allowed',
+                          background: C.panel2,
+                          color: C.muted,
+                          border: `1px solid ${C.border}`,
+                          width: '100%',
+                        }}
+                      >
+                        Disabled
+                      </Btn>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 4,
+                          marginTop: 2,
+                        }}
+                      >
+                        <span style={{ color: C.muted, fontSize: '0.72rem' }}>
+                          Disabled ({chosenPlanKey} chosen)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPlanKey(p.key)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: C.accent,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            textDecoration: 'underline',
+                            fontWeight: 600,
+                          }}
+                          title={`Choose ${p.key} plan`}
+                        >
+                          Choose this plan →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <p style={{ color: C.muted, fontSize: '0.75rem', marginBottom: 0, marginTop: 12 }}>
