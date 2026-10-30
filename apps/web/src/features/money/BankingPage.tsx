@@ -192,10 +192,77 @@ export function BankingPage() {
           },
         ],
       });
+      setNotice(`Confirmed match for Journal ${suggestion.entryNumber} — updated books & dashboard.`);
       txns.reload();
       suggestions.reload();
+      accounts.reload();
     } catch (err) {
       setError(err);
+    }
+  }
+
+  async function confirmLine(bankTransactionId: string, narration: string) {
+    setError(null);
+    try {
+      await api('POST', '/api/v1/reconciliation/from-line', {
+        bankTransactionId,
+        description: narration,
+      });
+      setNotice(`Confirmed and posted "${narration}" to ledger & dashboard!`);
+      txns.reload();
+      suggestions.reload();
+      accounts.reload();
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  async function confirmAllScanned() {
+    setScanning(true);
+    setError(null);
+    setNotice('');
+    try {
+      const firstLine = csv.trim().split('\n')[0] || '';
+      const cols = firstLine.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+      const dateCol = cols.find((c) => /date/i.test(c)) || 'Date';
+      const narrCol = cols.find((c) => /narration|desc/i.test(c)) || 'Narration';
+      const refCol = cols.find((c) => /ref|utr|chq/i.test(c)) || 'Ref';
+      const creditCol = cols.find((c) => /^credit$/i.test(c));
+      const debitCol = cols.find((c) => /^debit$/i.test(c));
+      const amountCol = cols.find((c) => /^amount$/i.test(c)) || 'Amount';
+
+      const mapping =
+        creditCol && debitCol
+          ? { date: dateCol, narration: narrCol, credit: creditCol, debit: debitCol, reference: refCol }
+          : { date: dateCol, narration: narrCol, amount: amountCol, reference: refCol };
+
+      await api('POST', `/api/v1/bank-accounts/${active}/import`, { csv, mapping });
+      const res = await api<{ transactions: BankTxn[] }>(
+        'GET',
+        `/api/v1/bank-accounts/${active}/transactions`,
+      );
+      let count = 0;
+      for (const t of res.transactions) {
+        if (t.status === 'unreconciled') {
+          const tid = String(t.id ?? t._id);
+          await api('POST', '/api/v1/reconciliation/from-line', {
+            bankTransactionId: tid,
+            description: t.narration,
+          }).catch(() => undefined);
+          count++;
+        }
+      }
+      setNotice(`Confirmed and posted ${count} scanned line(s) into the books & dashboard!`);
+      setCsv('');
+      setScan(null);
+      setSelectedFileName('');
+      txns.reload();
+      suggestions.reload();
+      accounts.reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -378,6 +445,18 @@ export function BankingPage() {
                     ),
                   ])}
                 />
+                <div style={{ marginTop: 14, display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <Btn
+                    kind="primary"
+                    disabled={scanning}
+                    onClick={() => void confirmAllScanned()}
+                  >
+                    {scanning ? 'Posting to Books…' : '✓ Confirm & Post All Scanned Lines to Dashboard'}
+                  </Btn>
+                  <span style={{ fontSize: '0.8rem', color: C.muted }}>
+                    Posts entries directly into the Bank Ledger and updates your Cash & Flow Dashboard.
+                  </span>
+                </div>
                 {scan.unparsed.length > 0 && (
                   <pre
                     style={{
@@ -436,13 +515,28 @@ export function BankingPage() {
           <Card title="Bank transactions">
             <Err error={txns.error} />
             <Tbl
-              head={['Date', 'Narration', 'Direction', 'Amount', 'Status']}
+              head={['Date', 'Narration', 'Direction', 'Amount', 'Status', 'Action']}
+              empty="No transactions recorded yet."
               rows={(txns.data?.transactions ?? []).map((t) => [
                 dateStr(t.date),
                 t.narration,
                 <Badge key="d" value={t.direction} />,
                 <Money key="a" paise={t.amountPaise} />,
                 <Badge key="s" value={t.status} />,
+                t.status === 'unreconciled' ? (
+                  <Btn
+                    key="p"
+                    small
+                    kind="primary"
+                    onClick={() => void confirmLine(String(t.id ?? t._id), t.narration)}
+                  >
+                    Confirm & Post
+                  </Btn>
+                ) : (
+                  <span key="r" style={{ color: C.green, fontSize: '0.8rem' }}>
+                    ✓ Reconciled
+                  </span>
+                ),
               ])}
             />
           </Card>

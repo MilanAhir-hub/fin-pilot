@@ -1527,52 +1527,8 @@ function Shell({
             </button>
           </div>
 
-          {/* Right: Search, Theme Toggle, Profile Avatar, Neutral Sign out */}
+          {/* Right: Theme Toggle, Profile Avatar, Neutral Sign out */}
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            {/* Search Bar */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--panel-2)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '0.42rem 0.85rem',
-                color: C.muted,
-                fontSize: '0.84rem',
-                minWidth: 220,
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.6 }}
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <span style={{ flex: 1, opacity: 0.75 }}>Search anything...</span>
-              <kbd
-                style={{
-                  fontSize: '0.68rem',
-                  background: 'var(--panel-3)',
-                  border: 'none',
-                  borderRadius: 4,
-                  padding: '2px 6px',
-                  color: C.muted,
-                  fontFamily: 'inherit',
-                }}
-              >
-                Ctrl K
-              </kbd>
-            </div>
 
             {/* Super Admin Switcher */}
             {user.superAdmin && (

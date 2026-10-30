@@ -10,6 +10,7 @@ import { BankAccount } from '../models/BankAccount';
 import { BankTransaction } from '../models/BankTransaction';
 import { JournalEntry } from '../models/JournalEntry';
 import { Reconciliation } from '../models/Reconciliation';
+import { accountRepo } from '../repositories/accountRepo';
 import { requireCompanyContext } from '../plugins/tenantScope';
 import { AppError } from '../utils/AppError';
 import { withTransaction } from '../utils/withTransaction';
@@ -137,12 +138,27 @@ export const reconciliationService = {
   /** "Create entry from this line": posts through the engine, then confirms. */
   async createFromLine(
     bankTransactionId: string,
-    input: { accountId: string; description: string },
+    input: { accountId?: string; description?: string } = {},
   ): Promise<{ journalEntryId: string }> {
     const ctx = requireCompanyContext();
     const txn = await BankTransaction.findOne({ _id: bankTransactionId }).lean();
     if (!txn || txn.status !== 'unreconciled') throw new AppError('DOC_INVALID_STATE', 409);
     const bank = await BankAccount.findOne({ _id: txn.bankAccountId }).lean();
+    if (!bank) throw new AppError('SYS_NOT_FOUND', 404);
+
+    let targetAccountId: Types.ObjectId | null = input.accountId
+      ? new Types.ObjectId(input.accountId)
+      : null;
+    if (!targetAccountId) {
+      const code = txn.direction === 'credit' ? '4100' : '5100';
+      const defAcc = await accountRepo.findByCode(code);
+      if (defAcc) {
+        targetAccountId = defAcc._id;
+      } else {
+        const anyAcc = await accountRepo.findByCode(txn.direction === 'credit' ? '4000' : '5000');
+        targetAccountId = anyAcc ? anyAcc._id : bank.ledgerAccountId;
+      }
+    }
 
     const entry = await withTransaction((session) =>
       GeneralLedger.post(
@@ -154,12 +170,12 @@ export const reconciliationService = {
           lines:
             txn.direction === 'credit'
               ? [
-                  { accountId: bank!.ledgerAccountId, debitPaise: txn.amountPaise },
-                  { accountId: new Types.ObjectId(input.accountId), creditPaise: txn.amountPaise },
+                  { accountId: bank.ledgerAccountId, debitPaise: txn.amountPaise },
+                  { accountId: targetAccountId!, creditPaise: txn.amountPaise },
                 ]
               : [
-                  { accountId: new Types.ObjectId(input.accountId), debitPaise: txn.amountPaise },
-                  { accountId: bank!.ledgerAccountId, creditPaise: txn.amountPaise },
+                  { accountId: targetAccountId!, debitPaise: txn.amountPaise },
+                  { accountId: bank.ledgerAccountId, creditPaise: txn.amountPaise },
                 ],
         },
         ctx.userId!,

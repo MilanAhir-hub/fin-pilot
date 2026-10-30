@@ -54,7 +54,7 @@ reconciliationRoutes.post(
   validate(
     z.object({
       bankTransactionId: z.string().length(24),
-      accountId: z.string().length(24),
+      accountId: z.string().length(24).optional(),
       description: z.string().max(500).default(''),
     }),
   ),

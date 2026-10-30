@@ -190,6 +190,17 @@ export function DashboardPage() {
   const expenses = useLoad(() => api<{ expenses: BillRow[] }>('GET', '/api/v1/expenses'));
   const billing = useLoad(() => api<Billing>('GET', '/api/v1/billing'));
   const payments = useLoad(() => api<{ payments: PaymentRow[] }>('GET', '/api/v1/payments'));
+  const bankTxns = useLoad(() =>
+    api<{
+      transactions: Array<{
+        date?: string;
+        txnDate?: string;
+        direction: 'credit' | 'debit';
+        amountPaise: number;
+        status: string;
+      }>;
+    }>('GET', '/api/v1/bank-accounts/all-transactions').catch(() => ({ transactions: [] })),
+  );
   const ims = useLoad(() =>
     api<{ records: ImsRecord[] }>('GET', `/api/v1/gst/ims${qs({ period: thisMonth() })}`).catch(
       () => ({ records: [] }),
@@ -198,8 +209,7 @@ export function DashboardPage() {
 
   const weekLabels = (cash.data?.weeks ?? []).map((_, i) => `W${i + 1}`);
 
-  // Actual cash movement, from recorded payments. The chart above it is a
-  // FORECAST of what is due; this is what has really moved, month by month.
+  // Actual cash movement, from recorded payments and confirmed bank lines.
   const flow = (() => {
     const months = new Map<string, { in: number; out: number }>();
     for (const p of payments.data?.payments ?? []) {
@@ -208,6 +218,17 @@ export function DashboardPage() {
       if (p.direction === 'inflow') row.in += p.amountPaise;
       else row.out += p.amountPaise;
       months.set(key, row);
+    }
+    for (const b of bankTxns.data?.transactions ?? []) {
+      if (b.status === 'reconciled') {
+        const d = b.date || b.txnDate;
+        if (!d) continue;
+        const key = String(d).slice(0, 7);
+        const row = months.get(key) ?? { in: 0, out: 0 };
+        if (b.direction === 'credit') row.in += b.amountPaise;
+        else row.out += b.amountPaise;
+        months.set(key, row);
+      }
     }
     const keys = [...months.keys()].sort();
     return {
@@ -241,6 +262,9 @@ export function DashboardPage() {
     (bills.data?.bills ?? []).filter((b) => b.status === 'draft').length +
     (expenses.data?.expenses ?? []).filter((x) => x.status === 'submitted').length;
   const imsUnactioned = (ims.data?.records ?? []).filter((r) => r.action === 'no_action').length;
+  const unreconciledBankCount = (bankTxns.data?.transactions ?? []).filter(
+    (t) => t.status === 'unreconciled',
+  ).length;
   const recent = (invoices.data?.invoices ?? []).slice(0, 5);
 
   const attention: Array<{
@@ -261,6 +285,13 @@ export function DashboardPage() {
       icon: <HugeiconsIcon icon={CheckmarkCircle01Icon} size={28} />,
       text: `${pendingApprovals} bill/expense approval(s) waiting on you`,
       route: 'bills',
+      severity: 'warn',
+    });
+  if (unreconciledBankCount > 0)
+    attention.push({
+      icon: <HugeiconsIcon icon={BankIcon} size={28} />,
+      text: `${unreconciledBankCount} bank statement transaction(s) waiting for confirmation`,
+      route: 'banking',
       severity: 'warn',
     });
   if (imsUnactioned > 0)

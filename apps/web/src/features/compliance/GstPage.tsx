@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { api, getCompanyId, qs } from '../../lib/api';
-import { validateGstin } from '@finpilot/shared';
+import { validateGstin, gstinCheckDigit } from '@finpilot/shared';
 import {
   Badge,
   Btn,
@@ -130,6 +130,16 @@ function GstinSetup() {
     }
   }
 
+  let suggestedGstin: string | null = null;
+  if (clean.length >= 14) {
+    try {
+      const chk = gstinCheckDigit(clean.slice(0, 14));
+      suggestedGstin = clean.slice(0, 14) + chk;
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <Card title="This company has no GSTIN yet">
       <p style={{ color: C.muted, fontSize: '0.88rem', marginTop: 0 }}>
@@ -140,7 +150,7 @@ function GstinSetup() {
         <Field label="Company GSTIN">
           <input
             style={{ ...S.input, margin: 0, width: 240, textTransform: 'uppercase' }}
-            placeholder="24AAAAA0000A1Z5"
+            placeholder="24AAAAA0000A1Z8"
             value={value}
             maxLength={15}
             onChange={(e) => setValue(e.target.value)}
@@ -151,11 +161,35 @@ function GstinSetup() {
         </Btn>
       </Row>
       {clean.length > 0 && !ok && (
-        <p style={{ color: C.amber, fontSize: '0.8rem', marginBottom: 0 }}>
-          {clean.length < 15
-            ? `${15 - clean.length} character(s) to go — a GSTIN is 15 characters.`
-            : 'That GSTIN fails its checksum. Check it against your registration certificate.'}
-        </p>
+        <div style={{ color: C.amber, fontSize: '0.82rem', marginTop: 8 }}>
+          {clean.length < 15 ? (
+            `${15 - clean.length} character(s) to go — a GSTIN is 15 characters.`
+          ) : (
+            <div>
+              <span>That GSTIN fails its checksum. </span>
+              {suggestedGstin && (
+                <span>
+                  Expected 15th checksum character is <strong>'{suggestedGstin[14]}'</strong>.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setValue(suggestedGstin!)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: C.accent,
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Click to fix to {suggestedGstin}
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       )}
       <Err error={error} />
     </Card>

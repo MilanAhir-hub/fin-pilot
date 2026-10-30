@@ -212,6 +212,10 @@ export const bankingService = {
     return BankTransaction.find({ bankAccountId }).sort({ txnDate: -1, _id: -1 }).limit(500).lean();
   },
 
+  listAllTransactions() {
+    return BankTransaction.find({}).sort({ txnDate: -1, _id: -1 }).limit(500).lean();
+  },
+
   // ── AA flow: consent → callback → pull ──────────────────────────────
   async aaConsent(companyId: string, bankAccountId: string) {
     const account = await BankAccount.findOne({ _id: bankAccountId });

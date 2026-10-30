@@ -125,6 +125,13 @@ bankingRoutes.post(
   }),
 );
 bankingRoutes.get(
+  '/all-transactions',
+  authorize('bank:reconcile'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    ok(res, { transactions: await bankingService.listAllTransactions() });
+  }),
+);
+bankingRoutes.get(
   '/:id/transactions',
   authorize('bank:reconcile'),
   asyncHandler(async (req: Request, res: Response) => {
