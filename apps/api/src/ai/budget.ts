@@ -1,7 +1,7 @@
 /**
- * L4 — AI budget (plan.md §19.6, §24). FAILS CLOSED: Mongo is the source of
- * truth; Redis is only ever a cache. assertBudget runs BEFORE the first LLM
- * call — over-quota costs ZERO tokens.
+ * AI Usage & Token Budgeting:
+ * Enforces monthly AI token usage limits per organization subscription plan.
+ * Verifies available token quota before making calls to prevent excess consumption.
  */
 import { upgradePathFor } from '@finpilot/shared';
 import { AiUsage } from '../models/AiConversation';

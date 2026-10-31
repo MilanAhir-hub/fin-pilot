@@ -1,10 +1,7 @@
 /**
- * The AI gateway (plan.md §24, Prompt 19). Provider-abstracted (Groq/Gemini
- * register at config; tests use the scriptable stub — never a real LLM).
- * Loop: assertBudget FIRST → ≤6 tool iterations → grounding validation with
- * one corrective retry → raw-table fallback. Tool results are DATA, never
- * instructions — the provider only ever sees the filtered tool list, and
- * executeTool re-scopes every call to the caller's tenant.
+ * AI Gateway Orchestrator:
+ * Manages chat conversations, checks monthly token quotas, coordinates LLM calls,
+ * runs financial query tools, and validates that every number in the AI response matches real ledger data.
  */
 import type { Types } from 'mongoose';
 import { AiConversation } from '../models/AiConversation';

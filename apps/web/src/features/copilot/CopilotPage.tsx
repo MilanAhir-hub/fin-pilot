@@ -1,8 +1,7 @@
 /**
- * AI Copilot (§32 Phase 19/20). Streams the turn over SSE with tool-call
- * chips (I9: every figure comes from a tool result — grounding-validated
- * server-side). Write tools land in the proposal inbox below: the human sees
- * the payload and clicks Confirm — the server recomputes everything (I10/I5).
+ * Copilot Chat Interface:
+ * Interactive chat UI where users query financial metrics, view real-time AI responses,
+ * inspect which tools retrieved the data, and review automated bookkeeping proposals.
  */
 import { useEffect, useRef, useState } from 'react';
 import { api, sse } from '../../lib/api';

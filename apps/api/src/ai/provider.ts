@@ -1,7 +1,7 @@
 /**
- * LLM Provider Registration & Execution Engine (plan.md §24).
- * Supports Gemini API, Groq/OpenAI APIs, and a smart local dev engine
- * that executes ledger tools against the real MongoDB database when an API key is not provided.
+ * LLM Provider Connector:
+ * Integrates external AI models (Google Gemini, Groq, OpenAI) and provides a smart
+ * local fallback engine to query MongoDB financial records without an external API key.
  */
 import { getEnv } from '../config/env';
 import { logger } from '../config/logger';

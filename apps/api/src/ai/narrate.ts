@@ -1,16 +1,7 @@
 /**
- * Turns a tool result into a sentence a person can read.
- *
- * The Copilot narrates through Gemini when it can, but the free tier returns
- * 429 the moment a quota runs out, and then every answer comes from the local
- * engine instead. That engine only knew a handful of result shapes and printed
- * `JSON.stringify(result)` for the rest — so asking about payables, invoices,
- * the trial balance or the GST return returned a wall of JSON with paise in it.
- *
- * Every number printed here comes from the tool result, formatted through
- * formatINR, so the I9 grounding check still passes: the validator accepts a
- * paise figure from the corpus or its rupee rendering, which is exactly what
- * formatINR produces.
+ * Financial Data Narrator:
+ * Formats raw accounting data, ledger reports, GST summaries, and balance figures
+ * into clean, human-readable sentences with Indian Rupee (INR) currency formatting.
  */
 import { formatINR } from '@finpilot/shared';
 

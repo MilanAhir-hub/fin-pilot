@@ -1,7 +1,7 @@
 /**
- * The numeric grounding validator (I9, plan.md §24). Every figure in a
- * Copilot answer must appear in a tool result from the SAME turn. Fail
- * closed: invalid → retry once with a corrective message → raw table.
+ * Financial Grounding & Accuracy Guardrails:
+ * Verifies that all monetary amounts and figures in an AI response originate directly
+ * from real database query results, preventing hallucinations and fabricated numbers.
  */
 
 const numberTokens = (text: string): string[] =>

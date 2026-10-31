@@ -1,4 +1,7 @@
-/** Copilot persistence (plan.md §8.1): conversations, tool-call audit, usage. */
+/**
+ * AI Conversation & Usage Database Models:
+ * Stores chat conversation history, tool-call audit logs, and monthly token usage tracking.
+ */
 import { Schema, model, type Types } from 'mongoose';
 import { tenantScope } from '../plugins/tenantScope';
 

@@ -1,4 +1,8 @@
-/** Copilot routes (§18.5): conversations + SSE messages. */
+/**
+ * AI & Copilot API Routes:
+ * Exposes REST and SSE endpoints for managing AI chat conversations,
+ * streaming Copilot responses, and fetching token usage stats.
+ */
 import { Router, type Request, type Response } from 'express';
 import { Types } from 'mongoose';
 import { z } from 'zod';

@@ -1,8 +1,7 @@
 /**
- * The tool registry (plan.md §24, Prompt 19). READ tools only — writes are
- * Phase 20 proposals. Each tool declares its permission; the list sent to
- * the model is FILTERED by the caller's permissions, and executeTool
- * OVERWRITES any model-supplied companyId with the server's (I8 + I9).
+ * Copilot Tool Registry:
+ * Exposes safe, tenant-scoped accounting tools (invoices, bills, bank transactions,
+ * GST returns, cash flow, profit & loss) that the AI can call to answer user questions.
  */
 import { z } from 'zod';
 import { Types } from 'mongoose';
