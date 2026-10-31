@@ -1,7 +1,7 @@
 /**
- * Platform-operator gate (§2.1 "Manage platform tenants"). superAdmin is a
- * User flag no API can grant — seed/ops only. An impersonation token NEVER
- * passes: the admin console is off-limits while acting as someone else.
+ * Super Admin Gate Middleware:
+ * Restricts access to platform-level administrative operations and tenant management
+ * exclusively to verified super-admin operators.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { User } from '../models/User';

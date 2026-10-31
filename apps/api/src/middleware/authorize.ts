@@ -1,7 +1,7 @@
 /**
- * Per-route RBAC (plan.md §17.4). The permission is declared AT THE ROUTE,
- * visible in one grep. Never `if (user.role === 'admin')` anywhere — roles
- * are data; permissions are the interface.
+ * Role-Based Access Control (RBAC) Middleware:
+ * Checks whether the authenticated user has the specific permission required for the route
+ * within the active company, blocking unauthorized actions with a 403 error.
  */
 import type { NextFunction, Request, Response } from 'express';
 import type { Permission } from '@finpilot/shared';

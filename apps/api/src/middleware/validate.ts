@@ -1,7 +1,7 @@
 /**
- * Zod validation middleware (plan.md §5.3 #12). Controllers receive parsed,
- * typed data; a failure short-circuits to the errorHandler as a ZodError,
- * which renders 422 SYS_VALIDATION_FAILED with `flatten()` in details.
+ * Schema Validation Middleware:
+ * Validates request body, query parameters, and route params using Zod schemas,
+ * rejecting invalid payloads with structured 422 validation errors.
  */
 import type { NextFunction, Request, Response } from 'express';
 import type { ZodTypeAny } from 'zod';

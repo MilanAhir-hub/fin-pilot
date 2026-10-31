@@ -1,12 +1,7 @@
 /**
- * Section gate. A platform operator can switch a section off for a company
- * (`Company.disabledModules`); this is what makes that a real restriction
- * rather than a hidden nav item — the API refuses the section's routes too,
- * so a saved bookmark or a direct curl gets the same answer as the UI.
- *
- * Runs AFTER tenantResolve, because which sections are off is a property of
- * the resolved company. Mounted per router alongside authenticate/tenantResolve
- * so the gate is visible in the route file rather than buried in a global.
+ * Feature Module Gate Middleware:
+ * Verifies that the targeted business section (e.g., GST, banking, payroll, inventory)
+ * is enabled for the active company before processing the request.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { Company } from '../models/Company';

@@ -1,8 +1,7 @@
 /**
- * Rate limiting middleware (plan.md §19).
- * L1 global per-IP sliding window · L2/L3 per-user token bucket with route
- * cost weighting · auth limiter that FAILS CLOSED (§19.6).
- * RateLimit-* headers on every limited response; Retry-After on 429.
+ * API Rate Limiting Middleware:
+ * Implements token-bucket and sliding-window rate limiters per IP and organization plan
+ * to protect the API against brute-force attacks, abuse, and resource exhaustion.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { getEnv } from '../config/env';

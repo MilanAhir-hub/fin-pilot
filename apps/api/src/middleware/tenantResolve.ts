@@ -1,10 +1,7 @@
 /**
- * Middleware #8 (plan.md §5.3): resolves the tenant and enters request
- * context. Runs AFTER authenticate (no tenant without a user) and BEFORE
- * authorize (permissions are per-company).
- *
- * Book-data routes take `X-Company-Id`; company-scoped admin routes
- * (/companies/:id/…) take the :id route param.
+ * Multi-Tenant Scope Resolver Middleware:
+ * Extracts company context from headers (X-Company-Id) or route parameters,
+ * verifies user membership, and sets the tenant boundary for all subsequent queries.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { Types } from 'mongoose';

@@ -1,8 +1,7 @@
 /**
- * One place, one shape (plan.md §18.4). Everything the app can throw lands
- * here and leaves as the error envelope. Full stacks go to the log only —
- * never to the client. Unhandled errors go to Sentry tagged with the
- * requestId (§25 — a no-op unless SENTRY_DSN initialised it at boot).
+ * Global Centralized Error Handler:
+ * Catches all thrown application errors, schema validation failures, and database errors,
+ * converting them into standardized error JSON responses and logging to Sentry.
  */
 import * as Sentry from '@sentry/node';
 import type { NextFunction, Request, Response } from 'express';

@@ -1,7 +1,7 @@
 /**
- * Idempotency middleware (I7, §18.6) for money-moving mutations.
- * insertOne is the lock; do NOT findOne-then-insert — that race pays a
- * supplier twice. A failed handler releases the key so the client may retry.
+ * Financial Mutation Idempotency Middleware:
+ * Uses Idempotency-Key headers to lock and prevent duplicate transactions
+ * (e.g., preventing accidental double payments, invoices, or journal entries).
  */
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';

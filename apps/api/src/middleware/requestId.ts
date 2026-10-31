@@ -1,6 +1,7 @@
 /**
- * Middleware #1 (plan.md §5.3): uuid v7 request id, propagated as
- * X-Request-Id and stamped into every log line and every envelope.
+ * Unique Request ID Middleware:
+ * Assigns a UUID v7 identifier to every incoming request, returning it in the
+ * X-Request-Id header to trace requests across logs, metrics, and error reports.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { v7 as uuidv7 } from 'uuid';

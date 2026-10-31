@@ -1,11 +1,7 @@
 /**
- * Middleware #7 (plan.md §5.3): verifies the Bearer access JWT → req.user.
- * No companyId here — tenantResolve (Phase 3) handles company context.
- *
- * Impersonation tokens (§32 Phase 23) take the slow path: the session must
- * still be open, EVERY request is appended to its action log, and every
- * response carries X-Impersonation-Session / X-Impersonated-By so the client
- * can render the loud banner.
+ * JWT Authentication Middleware:
+ * Verifies Bearer access tokens on incoming requests, sets authenticated user identity (req.user),
+ * and tracks super-admin impersonation sessions with audit logging.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { verifyAccessToken } from '../services/tokenService';

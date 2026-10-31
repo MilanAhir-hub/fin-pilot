@@ -1,6 +1,7 @@
 /**
- * Middleware #2 (plan.md §5.3): pino-http structured request logging.
- * Redacts Authorization and cookies; reuses the uuid v7 from requestId.
+ * HTTP Request Logging Middleware:
+ * Automatically logs structured incoming requests and outgoing response statuses,
+ * attaching unique request IDs while redacting sensitive tokens and passwords.
  */
 import pinoHttp from 'pino-http';
 import { logger } from '../config/logger';
