@@ -8,6 +8,7 @@ import { logger } from '../config/logger';
 import { Company } from '../models/Company';
 import { Party } from '../models/Party';
 import { requestContext } from '../plugins/tenantScope';
+import { narrateToolResult, narrateTrialBalance } from "./narrate";
 import { setLlmProvider, type LlmMessage, type LlmProvider, type LlmToolSpec, type LlmTurn } from './gateway';
 
 export function initLlmProvider(): void {
@@ -287,77 +288,31 @@ async function fallbackSmartTurn(
   const toolMap = new Set(tools.map((t) => t.name));
   const lastMsg = messages[messages.length - 1];
 
-  // 1. Tool Turn: If the last message is from a tool execution in THIS turn, format a grounding-safe answer
-  if (lastMsg && lastMsg.role === 'tool') {
+  // 1. Tool Turn: the last message is a tool result — narrate it in prose.
+  // narrateToolResult knows every shape the registry can return; it prints
+  // money through formatINR so the I9 grounding check still accepts it.
+  if (lastMsg && lastMsg.role === "tool") {
     try {
-      const res = JSON.parse(lastMsg.content) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(lastMsg.content);
 
-      // A) Proposal result (from write tools: proposeInvoice, proposeJournalEntry, proposeImsAction)
-      if (res.proposalId) {
-        const typeLabel =
-          res.type === 'invoice'
-            ? 'invoice draft'
-            : res.type === 'journal_entry'
-              ? 'journal entry'
-              : 'action';
-        return {
-          content: `I have drafted the ${typeLabel} proposal for your confirmation. You can review and confirm it in the Proposal inbox below.`,
-          tokens: 10,
-        };
+      // The trial balance comes back as a bare array, not an object.
+      if (Array.isArray(parsed)) {
+        return { content: narrateTrialBalance(parsed as Record<string, unknown>[]), tokens: 10 };
       }
 
-      if (typeof res.totalIncomePaise === 'number') {
-        const paise = res.totalIncomePaise;
-        const rupees = paise / 100;
-        if (paise === 0) {
-          return { content: 'Your total revenue is ₹0. No income transactions have been recorded yet.', tokens: 10 };
-        }
-        return { content: `Your total revenue is ₹${rupees} (${paise} paise recorded in your books).`, tokens: 10 };
-      }
+      const res = parsed as Record<string, unknown>;
+      const prose = narrateToolResult(res);
+      if (prose) return { content: prose, tokens: 10 };
 
-      if (typeof res.totalExpensesPaise === 'number') {
-        const paise = res.totalExpensesPaise;
-        const rupees = paise / 100;
-        if (paise === 0) {
-          return { content: 'Your total expenses are ₹0. No expense transactions have been recorded yet.', tokens: 10 };
-        }
-        return { content: `Your total expenses are ₹${rupees} (${paise} paise recorded in your books).`, tokens: 10 };
-      }
-
-      if (typeof res.netProfitPaise === 'number') {
-        const paise = res.netProfitPaise;
-        const rupees = paise / 100;
-        if (paise === 0) {
-          return { content: 'Your net profit/loss is ₹0. No transactions have been posted yet.', tokens: 10 };
-        }
-        const label = paise >= 0 ? 'net profit' : 'net loss';
-        return { content: `Your ${label} is ₹${Math.abs(rupees)} (${Math.abs(paise)} paise).`, tokens: 10 };
-      }
-
-      if (typeof res.balancePaise === 'number') {
-        const paise = res.balancePaise;
-        const rupees = paise / 100;
-        if (paise === 0) {
-          return { content: 'Your current cash position is ₹0. No cash transactions have been recorded yet.', tokens: 10 };
-        }
-        return { content: `Your current cash position is ₹${rupees} (${paise} paise).`, tokens: 10 };
-      }
-
-      if (res.score !== undefined) {
-        return { content: `Your business health score is ${String(res.score)} out of 100.`, tokens: 10 };
-      }
-
-      if (Array.isArray(res.receivables)) {
-        const count = res.receivables.length;
-        if (count === 0) {
-          return { content: 'You have no outstanding receivables at this time.', tokens: 10 };
-        }
-        return { content: `You have ${count} outstanding receivable(s) pending collection.`, tokens: 10 };
-      }
-
-      return { content: `Here is the data from your books: ${JSON.stringify(res)}`, tokens: 10 };
+      // Unknown shape. Say so plainly rather than printing the raw object:
+      // a wall of JSON with paise in it is not an answer.
+      return {
+        content:
+          "I retrieved that from your books, but I could not summarise this particular result. Ask me for it a different way and I will try again.",
+        tokens: 5,
+      };
     } catch {
-      return { content: 'Retrieved details from your financial books.', tokens: 5 };
+      return { content: "I retrieved details from your books, but could not read the result.", tokens: 5 };
     }
   }
 

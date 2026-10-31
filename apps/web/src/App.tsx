@@ -1684,6 +1684,16 @@ export function App() {
 
   const [company, setCompany] = useState<CompanyRow | null>(null);
   const [loading, setLoading] = useState(() => !getStoredUser());
+  /**
+   * Has the company-restore round-trip finished?
+   *
+   * `user` comes back synchronously from sessionStorage but `company` needs a
+   * fetch, and `loading` is already false for a cached user — so on every
+   * refresh the render hit `user && !company` and painted the company picker
+   * over the page you were on, for as long as the request took. The route was
+   * never lost; it was covered up.
+   */
+  const [companyRestored, setCompanyRestored] = useState(false);
   const [authView, setAuthView] = useState<'landing' | 'auth'>(() => {
     const hash = window.location.hash;
     return hash.startsWith('#login') || hash.startsWith('#register') ? 'auth' : 'landing';
@@ -1758,7 +1768,10 @@ export function App() {
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          setCompanyRestored(true);
+        }
       });
 
     return () => {
@@ -1844,7 +1857,22 @@ export function App() {
           }}
         />
       )}
-      {user && !company && (
+      {/* Still restoring: hold the frame rather than flashing the picker. */}
+      {user && !company && !companyRestored && (
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'grid',
+            placeItems: 'center',
+            background: 'var(--bg)',
+          }}
+        >
+          <div style={{ animation: 'fp-pulse 1.2s ease-in-out infinite' }}>
+            <Logo size="1.6rem" />
+          </div>
+        </div>
+      )}
+      {user && !company && companyRestored && (
         <CompanyPicker
           user={user}
           onPicked={(c) => {
