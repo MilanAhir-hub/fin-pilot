@@ -101,6 +101,11 @@ export function BankingPage() {
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [selectedFileName, setSelectedFileName] = useState('');
+  const [csvFileName, setCsvFileName] = useState('');
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
+  // Data rows, excluding the header and any trailing blank line — this is what
+  // "Import N rows" promises, so it must match what the parser will actually see.
+  const csvRowCount = csv.trim() ? Math.max(0, csv.trim().split(/\r?\n/).length - 1) : 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function createAccount(e: React.FormEvent) {
@@ -171,6 +176,7 @@ export function BankingPage() {
         `Imported ${result.imported}, skipped ${result.duplicates} duplicates (fingerprint dedupe).`,
       );
       setCsv('');
+      setCsvFileName('');
       setScan(null);
       setSelectedFileName('');
       txns.reload();
@@ -254,6 +260,7 @@ export function BankingPage() {
       }
       setNotice(`Confirmed and posted ${count} scanned line(s) into the books & dashboard!`);
       setCsv('');
+      setCsvFileName('');
       setScan(null);
       setSelectedFileName('');
       txns.reload();
@@ -477,16 +484,57 @@ export function BankingPage() {
             )}
           </Card>
 
-          <Card title="Import statement (CSV with header: Date,Narration,Amount,Ref)">
-            <textarea
-              style={{ ...S.input, height: 110, fontFamily: 'monospace' }}
-              placeholder={'Date,Narration,Amount,Ref\n2026-07-01,NEFT ACME RETAIL,59000.00,UTR123'}
-              value={csv}
-              onChange={(e) => setCsv(e.target.value)}
+          <Card title="Import statement (CSV)">
+            {/* Choosing a file fills the box below rather than uploading straight
+                away. The rows stay visible and editable, and Import is still the
+                only thing that writes — same review-before-commit rule the photo
+                scan follows. */}
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = ''; // so re-picking the same file fires again
+                if (!file) return;
+                setError(null);
+                setNotice('');
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const text = String(reader.result ?? '');
+                  setCsv(text);
+                  setCsvFileName(file.name);
+                };
+                reader.onerror = () => setError(new Error(`Could not read ${file.name}.`));
+                reader.readAsText(file);
+              }}
             />
             <Row>
+              <Btn kind="ghost" onClick={() => csvInputRef.current?.click()} disabled={!active}>
+                Choose CSV file
+              </Btn>
+              <span style={{ color: C.muted, fontSize: '0.82rem' }}>
+                {csvFileName ? `${csvFileName} — ${csvRowCount} row(s) ready` : 'or paste below'}
+              </span>
+            </Row>
+            <textarea
+              style={{ ...S.input, height: 110, fontFamily: 'monospace', marginTop: 10 }}
+              placeholder={'Date,Narration,Amount,Ref\n2026-07-01,NEFT ACME RETAIL,59000.00,UTR123'}
+              value={csv}
+              onChange={(e) => {
+                setCsv(e.target.value);
+                if (csvFileName) setCsvFileName('');
+              }}
+            />
+            <p style={{ color: C.muted, fontSize: '0.78rem', margin: '4px 0 8px' }}>
+              Needs a header row. Either an <b>Amount</b> column (negative means money out), or
+              separate <b>Credit</b> and <b>Debit</b> columns. A <b>Ref</b> column is optional.
+              Duplicate lines are skipped automatically, so re-importing the same statement is safe.
+            </p>
+            <Row>
               <Btn onClick={() => void importCsv()} disabled={!csv.trim()}>
-                Import
+                {csvRowCount > 0 ? `Import ${csvRowCount} row(s)` : 'Import'}
               </Btn>
               {notice && <span style={{ color: C.green, fontSize: '0.85rem' }}>{notice}</span>}
             </Row>

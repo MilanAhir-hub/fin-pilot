@@ -4,7 +4,8 @@
  * variables (index.css). The impersonation banner is LOUD by design (§32
  * Phase 23) and driven by response headers captured in lib/api.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { GST_STATE_CODES } from '@finpilot/shared';
 import {
   api,
   attemptSilentRefresh,
@@ -1230,18 +1231,102 @@ function ChartOfAccountsSetup() {
   );
 }
 
+/** Shared chrome for the two header menus. */
+const POPOVER: React.CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  left: 0,
+  zIndex: 40,
+  minWidth: 260,
+  padding: 8,
+  borderRadius: 10,
+  border: `1px solid ${C.border}`,
+  background: 'var(--panel)',
+  boxShadow: '0 14px 40px rgba(0,0,0,0.28)',
+};
+const POPOVER_CAP: React.CSSProperties = {
+  color: C.muted,
+  fontSize: '0.66rem',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  padding: '2px 8px 6px',
+};
+const POPOVER_ROW: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  width: '100%',
+  textAlign: 'left',
+  padding: '7px 8px',
+  borderRadius: 7,
+  border: 'none',
+  background: 'transparent',
+  fontSize: '0.84rem',
+  fontFamily: 'inherit',
+};
+const POPOVER_NOTE: React.CSSProperties = {
+  color: C.muted,
+  fontSize: '0.8rem',
+  padding: '7px 8px',
+};
+
+function ProfileLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '4px 8px', fontSize: '0.82rem' }}>
+      <span style={{ color: C.muted, flex: '0 0 72px' }}>{label}</span>
+      <span style={{ color: C.text, wordBreak: 'break-word', minWidth: 0 }}>{value}</span>
+    </div>
+  );
+}
+
 function Shell({
   user,
   company,
   onSwitch,
+  onPickCompany,
   onLogout,
 }: {
   user: PublicUser;
   company: CompanyRow;
   onSwitch: () => void;
+  onPickCompany: (c: CompanyRow) => void;
   onLogout: () => void;
 }) {
   const [route, go] = useHashRoute();
+
+  /**
+   * Header menus. Switching companies used to unmount the whole app back to
+   * the full-page picker, which meant losing the page you were on to change
+   * one thing in the header. Both menus now open in place, and picking a
+   * company swaps it where you stand.
+   */
+  const [menu, setMenu] = useState<'company' | 'profile' | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) setMenu(null);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [menu]);
+
+  // Only fetched once the company menu is actually opened.
+  const companyList = useLoad(
+    () =>
+      menu === 'company'
+        ? api<{ companies: CompanyRow[] }>('GET', '/api/v1/companies')
+        : Promise.resolve({ companies: [] as CompanyRow[] }),
+    [menu],
+  );
 
   // Sections switched off for this company by a platform operator. The API
   // refuses their routes regardless; hiding the nav just stops the user
@@ -1443,6 +1528,7 @@ function Shell({
           </div>
         )}
         <header
+          ref={headerRef}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -1457,10 +1543,10 @@ function Shell({
           }}
         >
           {/* Left: Company selector button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
             <button
               type="button"
-              onClick={onSwitch}
+              onClick={() => setMenu(menu === 'company' ? null : 'company')}
               title="Switch company"
               style={{
                 display: 'inline-flex',
@@ -1513,6 +1599,68 @@ function Shell({
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
+
+            {menu === 'company' && (
+              <div style={POPOVER}>
+                <div style={POPOVER_CAP}>Your companies</div>
+                {companyList.busy && <div style={POPOVER_NOTE}>Loading…</div>}
+                {!companyList.busy &&
+                  (companyList.data?.companies ?? []).map((c) => {
+                    const current = c.id === company.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setMenu(null);
+                          if (!current) onPickCompany(c);
+                        }}
+                        style={{
+                          ...POPOVER_ROW,
+                          background: current ? 'var(--accent-soft)' : 'transparent',
+                          cursor: current ? 'default' : 'pointer',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            minWidth: 0,
+                          }}
+                        >
+                          <span style={{ color: C.text, fontWeight: current ? 600 : 500 }}>
+                            {c.legalName}
+                          </span>
+                          <span style={{ color: C.muted, fontSize: '0.72rem' }}>
+                            {c.role?.name ?? ''}
+                          </span>
+                        </span>
+                        {current && (
+                          <span style={{ color: C.accent, fontSize: '0.72rem', flex: '0 0 auto' }}>
+                            current
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                {!companyList.busy && (companyList.data?.companies ?? []).length === 0 && (
+                  <div style={POPOVER_NOTE}>No companies yet.</div>
+                )}
+                <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 6, paddingTop: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      onSwitch();
+                    }}
+                    style={{ ...POPOVER_ROW, cursor: 'pointer', color: C.muted }}
+                  >
+                    Manage / add a company →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right: Theme Toggle, Profile Avatar, Neutral Sign out */}
@@ -1554,8 +1702,23 @@ function Shell({
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* User Profile Pill */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {/* User Profile Pill — opens the profile panel */}
+            <button
+              type="button"
+              title="Your profile"
+              onClick={() => setMenu(menu === 'profile' ? null : 'profile')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                background: menu === 'profile' ? 'var(--panel-3)' : 'transparent',
+                border: 'none',
+                borderRadius: 8,
+                padding: '0.2rem 0.35rem',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
               <div
                 style={{
                   width: 34,
@@ -1589,7 +1752,41 @@ function Shell({
                   {company.role.name}
                 </span>
               </div>
-            </div>
+            </button>
+
+            {menu === 'profile' && (
+              <div style={{ ...POPOVER, right: 0, left: 'auto', width: 280 }}>
+                <div style={POPOVER_CAP}>Profile</div>
+                <ProfileLine label="Name" value={user.name} />
+                <ProfileLine label="Email" value={user.email} />
+                <ProfileLine label="Role" value={company.role.name} />
+                {user.superAdmin && <ProfileLine label="Platform" value="Super admin" />}
+                <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0 6px' }} />
+                <div style={POPOVER_CAP}>Current company</div>
+                <ProfileLine label="Company" value={company.legalName} />
+                {company.gstin && <ProfileLine label="GSTIN" value={company.gstin} />}
+                {company.stateCode && (
+                  <ProfileLine
+                    label="State"
+                    value={`${company.stateCode}${
+                      GST_STATE_CODES[company.stateCode] ? ` — ${GST_STATE_CODES[company.stateCode]}` : ''
+                    }`}
+                  />
+                )}
+                <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 8, paddingTop: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      onLogout();
+                    }}
+                    style={{ ...POPOVER_ROW, cursor: 'pointer', color: C.red }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Neutral Secondary Sign out button */}
             <button
@@ -1887,7 +2084,30 @@ export function App() {
         />
       )}
       {user && company && (
-        <Shell user={user} company={company} onSwitch={() => setCompany(null)} onLogout={logout} />
+        <Shell
+          // Remount the whole shell when the company changes.
+          //
+          // Every page loads with useLoad(..., []) — fetch once on mount, never
+          // again — so switching the company in place changed the X-Company-Id
+          // header for future requests but refetched nothing, leaving the
+          // previous company's figures on screen. Keying on the id unmounts and
+          // remounts the subtree, so every loader refires against the company
+          // that is now selected.
+          key={company.id}
+          user={user}
+          company={company}
+          onSwitch={() => setCompany(null)}
+          onPickCompany={(c) => {
+            setCompanyId(c.id);
+            try {
+              localStorage.setItem('fp-company-id', c.id);
+            } catch {
+              /* ignore */
+            }
+            setCompany(c);
+          }}
+          onLogout={logout}
+        />
       )}
     </div>
   );
