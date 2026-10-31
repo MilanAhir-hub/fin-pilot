@@ -267,12 +267,21 @@ export function DashboardPage() {
   ).length;
   const recent = (invoices.data?.invoices ?? []).slice(0, 5);
 
+  const isCashNegative = (cash.data?.openingCashPaise ?? 0) < 0;
+
   const attention: Array<{
     icon: React.ReactNode;
     text: string;
     route: string;
     severity: 'bad' | 'warn' | 'ok';
   }> = [];
+  if (isCashNegative)
+    attention.push({
+      icon: <span style={{ fontSize: '1.4rem' }}>⚠️</span>,
+      text: '⚠️ Negative Cash Balance – Your business is profitable, but available cash is negative. Follow up on pending customer payments and review upcoming expenses.',
+      route: 'banking',
+      severity: 'bad',
+    });
   if (overdue.length > 0)
     attention.push({
       icon: <HugeiconsIcon icon={AlarmClockIcon} size={28} />,
@@ -311,6 +320,31 @@ export function DashboardPage() {
 
   return (
     <div>
+      {/* Warning banner when Cash on Hand is negative */}
+      {isCashNegative && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '0.9rem 1.25rem',
+            borderRadius: 12,
+            marginBottom: '1.25rem',
+            background: 'color-mix(in srgb, var(--amber) 12%, transparent)',
+            border: '1px solid var(--amber)',
+            color: C.text,
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            lineHeight: 1.5,
+          }}
+        >
+          <span>
+            ⚠️ Negative Cash Balance – Your business is profitable, but available cash is negative. Follow up on pending customer payments and review upcoming expenses.
+          </span>
+        </div>
+      )}
+
       {/* KPI tiles */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         <StatTile
@@ -318,6 +352,7 @@ export function DashboardPage() {
           paise={cash.data?.openingCashPaise ?? null}
           caption={`as of ${cash.data ? dateStr(cash.data.asOf) : '…'}`}
           icon={<HugeiconsIcon icon={Money01Icon} size={30} />}
+          tone={isCashNegative ? 'bad' : undefined}
           onClick={() => go('banking')}
         />
         <StatTile
