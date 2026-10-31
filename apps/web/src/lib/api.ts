@@ -363,7 +363,7 @@ export async function sse(
   }
 }
 
-function resizeImageIfNeeded(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
+function resizeImageIfNeeded(file: File, maxDim = 1200, quality = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
     // If not running in a browser with Image/Canvas, fall back to standard reader
     if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -379,8 +379,8 @@ function resizeImageIfNeeded(file: File, maxDim = 1600, quality = 0.85): Promise
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
-      if (width <= maxDim && height <= maxDim && file.size < 1_000_000) {
-        // Already compact, read as-is
+      // Only bypass if already a compact JPEG within dimensions
+      if (width <= maxDim && height <= maxDim && file.size < 150_000 && file.type === 'image/jpeg') {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
         reader.onerror = () => reject(new Error('file read failed'));
@@ -418,6 +418,7 @@ function resizeImageIfNeeded(file: File, maxDim = 1600, quality = 0.85): Promise
     img.src = url;
   });
 }
+
 
 /** Read a File (photo / PDF) into the base64 upload contract (§18.5). Downscales large camera photos to ensure fast, reliable transfer. */
 export async function fileToBase64(file: File): Promise<string> {

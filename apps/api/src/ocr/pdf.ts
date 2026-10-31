@@ -23,10 +23,10 @@ const cMapUrl = `${pdfjsRoot}/cmaps/`;
 
 /** Two text items belong to the same line within this many PDF user units. */
 const LINE_TOLERANCE = 3;
-/** Tesseract performs well at 120–150 DPI while keeping canvas memory bounded (~5MB vs 64MB). */
-const TARGET_DPI = 130;
+/** Tesseract performs well at 120 DPI while keeping canvas memory bounded (~4MB vs 64MB). */
+const TARGET_DPI = 120;
 /** Guard against high-resolution canvases triggering container OOM kills on memory-constrained hosts. */
-const MAX_RASTER_EDGE = 1400;
+const MAX_RASTER_EDGE = 1200;
 
 function open(content: Buffer) {
   return getDocument({
