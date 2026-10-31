@@ -7,6 +7,8 @@ import { tenantResolve } from '../../middleware/tenantResolve';
 import { requireCompanyContext } from '../../plugins/tenantScope';
 import { ReportJob } from '../../models/ReportJob';
 import { QUEUES, QUEUE_POLICY } from '../../queues/definitions';
+import { redisStatus } from '../../config/redis';
+import { processReportExport } from '../../jobs/reportExport';
 import { backoffOpts, getQueue } from '../../queues/infra';
 import { reportService } from '../../services/reportService';
 import { AppError } from '../../utils/AppError';
@@ -74,12 +76,29 @@ reportRoutes.post(
       params: { asOf: asOf(req).toISOString() },
       requestedBy: ctx.userId,
     });
-    const policy = QUEUE_POLICY[QUEUES.REPORT_EXPORT];
-    await getQueue(QUEUES.REPORT_EXPORT).add(
-      'export',
-      { reportJobId: String(job._id) },
-      { jobId: `report-${job._id}`, ...backoffOpts(policy.attempts, policy.backoffMs) },
-    );
+
+    let queued = false;
+    if (redisStatus('bull') === 'connected') {
+      try {
+        const policy = QUEUE_POLICY[QUEUES.REPORT_EXPORT];
+        await Promise.race([
+          getQueue(QUEUES.REPORT_EXPORT).add(
+            'export',
+            { reportJobId: String(job._id) },
+            { jobId: `report-${job._id}`, ...backoffOpts(policy.attempts, policy.backoffMs) },
+          ),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Queue timeout')), 1000)),
+        ]);
+        queued = true;
+      } catch {
+        // Enqueue timed out or failed; will process inline below
+      }
+    }
+
+    if (!queued) {
+      await processReportExport({ reportJobId: String(job._id) });
+    }
+
     ok(res, { jobId: String(job._id) }, 202);
   }),
 );
